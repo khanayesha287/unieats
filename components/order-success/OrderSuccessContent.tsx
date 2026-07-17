@@ -3,21 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Clock, Home, UtensilsCrossed } from "lucide-react";
-
-interface LastOrder {
-  orderNumber: string;
-  prepTime: string;
-  total: number;
-}
+import { formatPrice } from "@/lib/format";
+import { formatOrderTime } from "@/lib/cart-utils";
+import type { Order } from "@/lib/types";
 
 export default function OrderSuccessContent() {
-  const [order, setOrder] = useState<LastOrder | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     try {
       const stored = sessionStorage.getItem("unieats-last-order");
       if (stored) {
-        setOrder(JSON.parse(stored) as LastOrder);
+        setOrder(JSON.parse(stored) as Order);
       }
     } catch {
       setOrder(null);
@@ -25,7 +22,7 @@ export default function OrderSuccessContent() {
   }, []);
 
   const orderNumber = order?.orderNumber ?? "UE-PENDING-001";
-  const prepTime = order?.prepTime ?? "15–20 min";
+  const prepTime = "15–20 min";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
@@ -45,15 +42,83 @@ export default function OrderSuccessContent() {
         </p>
 
         <div className="mt-8 space-y-3 rounded-2xl bg-[#F3EDFF] p-6 text-left">
-          <p className="text-sm text-gray-600">
-            Order Number
-          </p>
+          <p className="text-sm text-gray-600">Order Number</p>
           <p className="text-xl font-bold text-[#6C2BD9]">{orderNumber}</p>
+          {order && (
+            <p className="text-sm text-gray-600">
+              Time: {formatOrderTime(order.timestamp)}
+            </p>
+          )}
           <div className="mt-4 flex items-center gap-2 text-sm text-gray-700">
             <Clock className="h-4 w-4 text-[#6C2BD9]" aria-hidden />
             Estimated preparation time: <strong>{prepTime}</strong>
           </div>
         </div>
+
+        {order && (
+          <div className="mt-6 space-y-4 text-left">
+            <div className="rounded-2xl border border-[#6C2BD9]/10 bg-white p-5 text-sm">
+              <p className="font-semibold text-gray-900">
+                {order.orderType === "pickup" ? "Pickup" : "Delivery"}
+              </p>
+              {order.deliveryLocation && (
+                <p className="mt-1 text-gray-600">{order.deliveryLocation}</p>
+              )}
+            </div>
+
+            {order.canteenOrders.map((group) => (
+              <div
+                key={group.canteenSlug}
+                className="rounded-2xl border border-[#6C2BD9]/10 bg-white p-5 text-left text-sm"
+              >
+                <h2 className="font-bold text-[#6C2BD9]">{group.canteenName}</h2>
+                <dl className="mt-3 space-y-1 text-gray-600">
+                  <div>
+                    <dt className="font-medium text-gray-900">Student</dt>
+                    <dd>{order.studentName}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-900">Registration</dt>
+                    <dd>{order.registrationNumber}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-900">Phone</dt>
+                    <dd>{order.phone}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-900">Items</dt>
+                    <dd>
+                      {group.items.map((item) => (
+                        <span key={item.id} className="block">
+                          {item.name} ×{item.quantity}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-900">Total</dt>
+                    <dd className="font-semibold text-[#6C2BD9]">
+                      {formatPrice(group.subtotal)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+
+            <div className="rounded-2xl border border-[#6C2BD9]/10 bg-white p-5 text-sm">
+              {order.deliveryFee > 0 && (
+                <div className="flex justify-between text-gray-600">
+                  <span>Delivery Fee</span>
+                  <span className="font-semibold">{formatPrice(order.deliveryFee)}</span>
+                </div>
+              )}
+              <div className="mt-2 flex justify-between text-base font-bold text-gray-900">
+                <span>Grand Total</span>
+                <span className="text-[#6C2BD9]">{formatPrice(order.grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link

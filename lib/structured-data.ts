@@ -18,7 +18,7 @@ export function getOrganizationJsonLd() {
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer support",
-      email: "support@unieats.pk",
+      email: "unieats.uet@gmail.com",
       availableLanguage: ["English", "Urdu"],
     },
   };

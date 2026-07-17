@@ -5,13 +5,14 @@ import { ArrowRight, ShoppingCart, Trash2 } from "lucide-react";
 import QuantitySelector from "@/components/ui/QuantitySelector";
 import { useCart } from "@/components/providers/CartProvider";
 import { formatPrice } from "@/lib/format";
-import { DELIVERY_FEE } from "@/lib/constants";
+import { groupItemsByCanteen } from "@/lib/cart-utils";
+import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
 
 export default function CartPageContent() {
   const { items, subtotal, updateQuantity, removeItem, isHydrated } = useCart();
+  const canteenGroups = groupItemsByCanteen(items);
   const discount = 0;
-  const deliveryFee = items.length > 0 ? DELIVERY_FEE : 0;
-  const grandTotal = subtotal + deliveryFee - discount;
+  const grandTotal = subtotal - discount;
 
   if (!isHydrated) {
     return (
@@ -60,43 +61,52 @@ export default function CartPageContent() {
       </header>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_380px]">
-        <section aria-label="Cart items" className="space-y-4">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className="group flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/90 p-4 shadow-lg shadow-[#6C2BD9]/5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:flex-row sm:items-center sm:p-5"
-            >
-              <div
-                className={`h-24 w-full shrink-0 rounded-2xl bg-gradient-to-br ${item.gradient} sm:h-20 sm:w-20`}
-                aria-hidden
-              />
+        <section aria-label="Cart items" className="space-y-6">
+          {canteenGroups.map((group) => (
+            <div key={group.canteenSlug}>
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[#F4C542]">
+                {group.canteenName}
+              </h2>
+              <div className="space-y-4">
+                {group.items.map((item) => (
+                  <article
+                    key={item.id}
+                    className="group flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/90 p-4 shadow-lg shadow-[#6C2BD9]/5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:flex-row sm:items-center sm:p-5"
+                  >
+                    <div
+                      className={`h-24 w-full shrink-0 rounded-2xl bg-gradient-to-br ${item.gradient} sm:h-20 sm:w-20`}
+                      aria-hidden
+                    />
 
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-bold text-gray-900">{item.name}</h2>
-                <p className="mt-0.5 text-sm text-gray-500">{item.canteenName}</p>
-                <p className="mt-2 text-lg font-bold text-[#6C2BD9]">
-                  {formatPrice(item.price)}
-                </p>
-              </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-lg font-bold text-gray-900">{item.name}</h3>
+                      <p className="mt-0.5 text-sm text-gray-500">{item.canteenName}</p>
+                      <p className="mt-2 text-lg font-bold text-[#6C2BD9]">
+                        {formatPrice(item.price)}
+                      </p>
+                    </div>
 
-              <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
-                <QuantitySelector
-                  value={item.quantity}
-                  onChange={(value) => updateQuantity(item.id, value)}
-                  size="sm"
-                  label={`Quantity for ${item.name}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeItem(item.id)}
-                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                  aria-label={`Remove ${item.name} from cart`}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                  Remove
-                </button>
+                    <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
+                      <QuantitySelector
+                        value={item.quantity}
+                        onChange={(value) => updateQuantity(item.id, value)}
+                        size="sm"
+                        label={`Quantity for ${item.name}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                        aria-label={`Remove ${item.name} from cart`}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                        Remove
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </article>
+            </div>
           ))}
         </section>
 
@@ -105,17 +115,28 @@ export default function CartPageContent() {
             <h2 className="text-xl font-bold text-gray-900">Order Summary</h2>
 
             <dl className="mt-6 space-y-3 text-sm">
-              <div className="flex justify-between text-gray-600">
+              {canteenGroups.map((group) => (
+                <div key={group.canteenSlug} className="flex justify-between text-gray-600">
+                  <dt>{group.canteenName}</dt>
+                  <dd className="font-semibold text-gray-900">
+                    {formatPrice(group.subtotal)}
+                  </dd>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-gray-100 pt-3 text-gray-600">
                 <dt>Subtotal</dt>
                 <dd className="font-semibold text-gray-900">
                   {formatPrice(subtotal)}
                 </dd>
               </div>
               <div className="flex justify-between text-gray-600">
-                <dt>Delivery Fee</dt>
-                <dd className="font-semibold text-gray-900">
-                  {formatPrice(deliveryFee)}
-                </dd>
+                <dt>
+                  Delivery Fee
+                  <span className="block text-xs font-normal text-gray-400">
+                    Rs.{DELIVERY_FEE_PER_CANTEEN} per canteen at checkout
+                  </span>
+                </dt>
+                <dd className="font-semibold text-gray-400">—</dd>
               </div>
               <div className="flex justify-between text-gray-600">
                 <dt>Discount</dt>
@@ -124,14 +145,12 @@ export default function CartPageContent() {
                 </dd>
               </div>
               <div className="flex justify-between border-t border-gray-100 pt-3 text-base">
-                <dt className="font-bold text-gray-900">Grand Total</dt>
+                <dt className="font-bold text-gray-900">Subtotal</dt>
                 <dd className="font-bold text-[#6C2BD9]">
                   {formatPrice(grandTotal)}
                 </dd>
               </div>
             </dl>
-
-            <PromoCodeForm />
 
             <Link
               href="/checkout"
@@ -144,30 +163,5 @@ export default function CartPageContent() {
         </aside>
       </div>
     </div>
-  );
-}
-
-function PromoCodeForm() {
-  return (
-    <form
-      className="mt-6 flex gap-2"
-      onSubmit={(event) => event.preventDefault()}
-    >
-      <label htmlFor="promo-code" className="sr-only">
-        Promo code
-      </label>
-      <input
-        id="promo-code"
-        type="text"
-        placeholder="Promo code"
-        className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm transition-colors focus:border-[#6C2BD9] focus:outline-none focus:ring-2 focus:ring-[#6C2BD9]/20"
-      />
-      <button
-        type="submit"
-        className="shrink-0 rounded-xl border border-[#6C2BD9] px-4 py-2.5 text-sm font-semibold text-[#6C2BD9] transition-all hover:bg-[#6C2BD9] hover:text-white"
-      >
-        Apply
-      </button>
-    </form>
   );
 }

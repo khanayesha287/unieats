@@ -2,6 +2,12 @@ import Link from "next/link";
 import { ArrowRight, Bike, Clock, Store } from "lucide-react";
 import { canteens } from "@/lib/data/canteens";
 
+const FEATURED_CANTEEN_NAMES = ["BSSC Canteen", "Bhola Canteen"];
+
+const featuredCanteens = canteens.filter((canteen) =>
+  FEATURED_CANTEEN_NAMES.includes(canteen.name)
+);
+
 export default function Canteens() {
   return (
     <section
@@ -21,8 +27,8 @@ export default function Canteens() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {canteens.map((canteen) => (
+        <div className="mx-auto grid max-w-3xl grid-cols-1 gap-8 sm:grid-cols-2">
+          {featuredCanteens.map((canteen) => (
             <article
               key={canteen.slug}
               className="group flex flex-col overflow-hidden rounded-3xl border border-transparent bg-white shadow-lg shadow-[#6C2BD9]/5 transition-all duration-300 hover:-translate-y-2 hover:border-[#6C2BD9]/20 hover:shadow-xl hover:shadow-[#6C2BD9]/15"

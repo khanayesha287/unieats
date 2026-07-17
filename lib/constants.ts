@@ -1,9 +1,16 @@
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://unieats.pk";
 
-export const WHATSAPP_NUMBER = "923197157979";
+export const WHATSAPP_NUMBER = "923424019343";
+export const WHATSAPP_URL = "https://wa.me/923424019343";
+export const WHATSAPP_DISPLAY = "+92 342 4019343";
 
-export const DELIVERY_FEE = 50;
+export const INSTAGRAM_URL =
+  "https://www.instagram.com/unieats_uet?igsh=dTR5MDE0ZDB1amN1";
+
+export const CONTACT_EMAIL = "unieats.uet@gmail.com";
+
+export const DELIVERY_FEE_PER_CANTEEN = 45;
 
 export const DEPARTMENTS = [
   "Computer Science",

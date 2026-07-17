@@ -2,13 +2,11 @@ import Link from "next/link";
 
 const menuItems = [
   { name: "Chicken Biryani", price: 220, canteen: "BSSC Canteen", gradient: "from-[#6C2BD9]/30 to-[#F4C542]/40" },
+  { name: "Chicken Karahi", price: 450, canteen: "BSSC Canteen", gradient: "from-[#5B21B6]/30 to-[#F4C542]/40" },
   { name: "Zinger Burger", price: 350, canteen: "Bhola Canteen", gradient: "from-[#7C3AED]/30 to-[#F4C542]/35" },
-  { name: "Chicken Shawarma", price: 280, canteen: "Iqbal Canteen", gradient: "from-[#5B21B6]/25 to-[#F4C542]/30" },
-  { name: "Loaded Fries", price: 250, canteen: "Annexe", gradient: "from-[#9333EA]/25 to-[#F4C542]/35" },
-  { name: "Chicken Karahi", price: 450, canteen: "Lalazar", gradient: "from-[#581C87]/30 to-[#F4C542]/40" },
-  { name: "Club Sandwich", price: 300, canteen: "GSSC", gradient: "from-[#6C2BD9]/25 to-[#C084FC]/30" },
-  { name: "Cold Coffee", price: 180, canteen: "Annexe", gradient: "from-[#4C1D95]/20 to-[#A78BFA]/30" },
-  { name: "Fresh Juice", price: 150, canteen: "Bhola", gradient: "from-[#F4C542]/40 to-[#6C2BD9]/20" },
+  { name: "Chicken Shawarma", price: 280, canteen: "Bhola Canteen", gradient: "from-[#6C2BD9]/25 to-[#F4C542]/30" },
+  { name: "Loaded Fries", price: 250, canteen: "Bhola Canteen", gradient: "from-[#9333EA]/25 to-[#F4C542]/35" },
+  { name: "Fresh Juice", price: 150, canteen: "Bhola Canteen", gradient: "from-[#F4C542]/40 to-[#6C2BD9]/20" },
 ];
 
 export default function FeaturedMenu() {
@@ -30,7 +28,7 @@ export default function FeaturedMenu() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {menuItems.map((item) => (
             <article
               key={item.name}
@@ -49,12 +47,12 @@ export default function FeaturedMenu() {
                   <p className="text-lg font-bold text-[#6C2BD9]">Rs.{item.price}</p>
                   <p className="text-sm text-[#F4C542]" aria-label="5 out of 5 stars">★★★★★</p>
                 </div>
-                <button
-                  type="button"
-                  className="mt-4 w-full rounded-full bg-[#6C2BD9] py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-md"
+                <Link
+                  href="/canteens"
+                  className="mt-4 flex w-full items-center justify-center rounded-full bg-[#6C2BD9] py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-md"
                 >
-                  Add to Cart
-                </button>
+                  Order Now
+                </Link>
               </div>
             </article>
           ))}

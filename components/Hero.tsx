@@ -20,8 +20,8 @@ export default function Hero() {
         aria-hidden
       />
 
-      <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-4 sm:px-6 lg:grid-cols-[55%_45%] lg:gap-16 lg:px-8">
-        <div className="animate-fade-up">
+      <div className="relative mx-auto flex max-w-4xl flex-col items-center px-4 text-center sm:px-6 lg:px-8">
+        <div className="animate-fade-up flex flex-col items-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#6C2BD9]/20 bg-white/80 px-4 py-2 text-sm font-medium text-[#6C2BD9] shadow-sm backdrop-blur-sm">
             📍 Available at UET Lahore Main Campus
           </span>
@@ -40,7 +40,7 @@ export default function Hero() {
             valuable time.
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-4">
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
               href="/canteens"
               className="rounded-full bg-[#6C2BD9] px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-1 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
@@ -55,7 +55,7 @@ export default function Hero() {
             </Link>
           </div>
 
-          <div className="mt-10 flex flex-wrap gap-3">
+          <div className="mt-10 flex flex-wrap justify-center gap-3">
             {[
               "⚡ Fast Ordering",
               "🚴 Campus Delivery",
@@ -68,61 +68,6 @@ export default function Hero() {
                 {badge}
               </span>
             ))}
-          </div>
-        </div>
-
-        <div className="animate-fade-up lg:justify-self-end" style={{ animationDelay: "0.15s" }}>
-          <div className="rounded-3xl border border-white/60 bg-white/70 p-6 shadow-2xl shadow-[#6C2BD9]/10 backdrop-blur-xl">
-            <div className="mb-4">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Select Canteen
-              </label>
-              <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3">
-                <span className="font-medium text-gray-900">BSSC Canteen</span>
-                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                { name: "Chicken Biryani", price: 220 },
-                { name: "Zinger Burger", price: 350 },
-                { name: "Shawarma", price: 280 },
-              ].map((item) => (
-                <div
-                  key={item.name}
-                  className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-3 transition-shadow hover:shadow-md"
-                >
-                  <div className="h-14 w-14 shrink-0 rounded-xl bg-gradient-to-br from-[#6C2BD9]/20 to-[#F4C542]/30" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-gray-900">{item.name}</p>
-                    <p className="text-sm font-medium text-[#6C2BD9]">Rs.{item.price}</p>
-                    <p className="text-xs text-[#F4C542]" aria-label="5 out of 5 stars">★★★★★</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-full bg-[#F3EDFF] px-3 py-1.5 text-xs font-semibold text-[#6C2BD9] transition-colors hover:bg-[#6C2BD9] hover:text-white"
-                  >
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 rounded-2xl bg-[#F3EDFF] p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">3 Items</span>
-                <span className="font-bold text-gray-900">Total Rs.850</span>
-              </div>
-              <Link
-                href="/checkout"
-                className="mt-3 flex w-full items-center justify-center rounded-full bg-[#6C2BD9] py-3 text-sm font-semibold text-white transition-all hover:bg-[#F4C542] hover:text-[#2E1065]"
-              >
-                Checkout
-              </Link>
-            </div>
           </div>
         </div>
       </div>

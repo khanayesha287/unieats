@@ -5,13 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { DEPARTMENTS, DELIVERY_FEE } from "@/lib/constants";
+import { DEPARTMENTS, DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
 import { formatPrice } from "@/lib/format";
+import {
+  buildOrder,
+  calculateDeliveryFee,
+  generateOrderNumber,
+  groupItemsByCanteen,
+} from "@/lib/cart-utils";
 import {
   buildWhatsAppUrl,
   formatWhatsAppOrderMessage,
 } from "@/lib/whatsapp";
-import { generateOrderNumber } from "@/lib/cart-utils";
 import type { CheckoutFormData, OrderType } from "@/lib/types";
 
 const initialForm: CheckoutFormData = {
@@ -34,7 +39,8 @@ export default function CheckoutPageContent() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const deliveryFee = form.orderType === "delivery" ? DELIVERY_FEE : 0;
+  const canteenGroups = useMemo(() => groupItemsByCanteen(items), [items]);
+  const deliveryFee = calculateDeliveryFee(items, form.orderType);
   const grandTotal = subtotal + deliveryFee;
   const prepTime = "15–20 min";
 
@@ -100,17 +106,11 @@ export default function CheckoutPageContent() {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const orderNumber = generateOrderNumber();
-    const message = formatWhatsAppOrderMessage(form, items, grandTotal);
+    const order = buildOrder(orderNumber, form, items);
+    const message = formatWhatsAppOrderMessage(order);
     const whatsappUrl = buildWhatsAppUrl(message);
 
-    sessionStorage.setItem(
-      "unieats-last-order",
-      JSON.stringify({
-        orderNumber,
-        prepTime,
-        total: grandTotal,
-      }),
-    );
+    sessionStorage.setItem("unieats-last-order", JSON.stringify(order));
 
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
     clearCart();
@@ -312,21 +312,34 @@ export default function CheckoutPageContent() {
           <div className="rounded-3xl border border-white/60 bg-white/90 p-6 shadow-xl shadow-[#6C2BD9]/10 backdrop-blur-sm">
             <h2 className="text-xl font-bold text-gray-900">Order Summary</h2>
 
-            <ul className="mt-4 space-y-3" role="list">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-start justify-between gap-3 text-sm"
-                >
-                  <span className="text-gray-700">
-                    {item.quantity} × {item.name}
-                  </span>
-                  <span className="shrink-0 font-semibold text-gray-900">
-                    {formatPrice(item.price * item.quantity)}
-                  </span>
-                </li>
+            <div className="mt-4 space-y-5">
+              {canteenGroups.map((group) => (
+                <div key={group.canteenSlug}>
+                  <h3 className="text-sm font-bold text-[#6C2BD9]">
+                    {group.canteenName}
+                  </h3>
+                  <ul className="mt-2 space-y-2" role="list">
+                    {group.items.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex items-start justify-between gap-3 text-sm"
+                      >
+                        <span className="text-gray-700">
+                          {item.quantity} × {item.name}
+                        </span>
+                        <span className="shrink-0 font-semibold text-gray-900">
+                          {formatPrice(item.price * item.quantity)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 flex justify-between text-sm font-semibold text-gray-900">
+                    <span>Canteen Total</span>
+                    <span>{formatPrice(group.subtotal)}</span>
+                  </p>
+                </div>
               ))}
-            </ul>
+            </div>
 
             <dl className="mt-6 space-y-3 border-t border-gray-100 pt-4 text-sm">
               <div className="flex justify-between text-gray-600">
@@ -336,7 +349,14 @@ export default function CheckoutPageContent() {
                 </dd>
               </div>
               <div className="flex justify-between text-gray-600">
-                <dt>Delivery Fee</dt>
+                <dt>
+                  Delivery Fee
+                  {form.orderType === "delivery" && canteenGroups.length > 0 && (
+                    <span className="block text-xs font-normal text-gray-400">
+                      {canteenGroups.length} canteen{canteenGroups.length > 1 ? "s" : ""} × Rs.{DELIVERY_FEE_PER_CANTEEN}
+                    </span>
+                  )}
+                </dt>
                 <dd className="font-semibold text-gray-900">
                   {formatPrice(deliveryFee)}
                 </dd>

@@ -49,3 +49,27 @@ export interface CheckoutFormData {
   specialInstructions: string;
   paymentMethod: "cash-pickup" | "cash-delivery";
 }
+
+export interface CanteenOrderGroup {
+  canteenSlug: string;
+  canteenName: string;
+  items: CartItem[];
+  subtotal: number;
+}
+
+export interface Order {
+  orderNumber: string;
+  studentName: string;
+  registrationNumber: string;
+  phone: string;
+  department: string;
+  orderType: OrderType;
+  deliveryLocation?: string;
+  specialInstructions?: string;
+  paymentMethod: "cash-pickup" | "cash-delivery";
+  canteenOrders: CanteenOrderGroup[];
+  subtotal: number;
+  deliveryFee: number;
+  grandTotal: number;
+  timestamp: string;
+}

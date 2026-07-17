@@ -1,57 +1,78 @@
-import type { CartItem, CheckoutFormData } from "@/lib/types";
-import { WHATSAPP_NUMBER } from "@/lib/constants";
+import type { Order } from "@/lib/types";
+import { WHATSAPP_URL } from "@/lib/constants";
+import { formatOrderTime } from "@/lib/cart-utils";
 
-export function formatWhatsAppOrderMessage(
-  form: CheckoutFormData,
-  items: CartItem[],
-  total: number,
-): string {
-  const itemLines = items
-    .map((item) => `${item.quantity} × ${item.name} - Rs.${item.price * item.quantity}`)
-    .join("\n\n");
+function formatCanteenBlock(order: Order, group: Order["canteenOrders"][number]): string {
+  const itemLines = group.items
+    .map((item) => `${item.name} ×${item.quantity}`)
+    .join("\n");
 
   const lines = [
-    "🍔 New UniEats Order",
+    group.canteenName,
     "",
-    "👤 Student:",
-    form.studentName,
+    "Student:",
+    order.studentName,
     "",
-    "🎓 Registration:",
-    form.registrationNumber,
+    "Registration:",
+    order.registrationNumber,
     "",
-    "📞 Phone:",
-    form.phone,
+    "Phone:",
+    order.phone,
     "",
-    "🏫 Department:",
-    form.department,
-    "",
-    "📍 Order Type:",
-    form.orderType === "pickup" ? "Pickup" : "Campus Delivery",
-  ];
-
-  if (form.orderType === "delivery" && form.deliveryLocation) {
-    lines.push("", "📌 Delivery Location:", form.deliveryLocation);
-  }
-
-  if (form.specialInstructions.trim()) {
-    lines.push("", "📝 Special Instructions:", form.specialInstructions.trim());
-  }
-
-  lines.push(
-    "",
-    "🛒 Items",
-    "",
+    "Items:",
     itemLines,
     "",
-    "💰 Total:",
-    `Rs.${total}`,
-    "",
-    "Thank you for choosing UniEats.",
-  );
+    "Total:",
+    `Rs.${group.subtotal}`,
+  ];
 
   return lines.join("\n");
 }
 
+export function formatWhatsAppOrderMessage(order: Order): string {
+  const orderTypeLabel =
+    order.orderType === "pickup" ? "Pickup" : "Delivery";
+
+  const header = [
+    "🍔 New UniEats Order",
+    "",
+    `Order #: ${order.orderNumber}`,
+    `Time: ${formatOrderTime(order.timestamp)}`,
+    "",
+    "Order Type:",
+    orderTypeLabel,
+  ];
+
+  if (order.orderType === "delivery" && order.deliveryLocation) {
+    header.push("", "Delivery Location:", order.deliveryLocation);
+  }
+
+  if (order.specialInstructions) {
+    header.push("", "Special Instructions:", order.specialInstructions);
+  }
+
+  const canteenBlocks = order.canteenOrders.map((group) =>
+    formatCanteenBlock(order, group),
+  );
+
+  const footer: string[] = [];
+
+  if (order.deliveryFee > 0) {
+    footer.push(
+      "",
+      `Delivery Fee: Rs.${order.deliveryFee} (${order.canteenOrders.length} canteen${order.canteenOrders.length > 1 ? "s" : ""} × Rs.100)`,
+    );
+  }
+
+  footer.push("", "Grand Total:", `Rs.${order.grandTotal}`, "", "Thank you for choosing UniEats.");
+
+  return [...header, "", "------------------------------------", "", ...canteenBlocks.flatMap((block, index) =>
+    index < canteenBlocks.length - 1
+      ? [block, "", "------------------------------------", ""]
+      : [block],
+  ), ...footer].join("\n");
+}
+
 export function buildWhatsAppUrl(message: string): string {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  return `${WHATSAPP_URL}?text=${encodeURIComponent(message)}`;
 }

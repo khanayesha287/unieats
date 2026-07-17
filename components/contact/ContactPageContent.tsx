@@ -3,12 +3,18 @@
 import { useState } from "react";
 import {
   Clock,
+  Instagram,
   Mail,
   MapPin,
   MessageCircle,
   Send,
 } from "lucide-react";
-import { WHATSAPP_NUMBER } from "@/lib/constants";
+import {
+  CONTACT_EMAIL,
+  INSTAGRAM_URL,
+  WHATSAPP_DISPLAY,
+  WHATSAPP_URL,
+} from "@/lib/constants";
 
 const faqs = [
   {
@@ -98,15 +104,22 @@ export default function ContactPageContent() {
           <ContactCard
             icon={MessageCircle}
             title="WhatsApp"
-            description="Chat with us for quick support."
-            href={`https://wa.me/${WHATSAPP_NUMBER}`}
+            description={WHATSAPP_DISPLAY}
+            href={WHATSAPP_URL}
             action="Message on WhatsApp"
+          />
+          <ContactCard
+            icon={Instagram}
+            title="Instagram"
+            description="@unieats_uet"
+            href={INSTAGRAM_URL}
+            action="Follow on Instagram"
           />
           <ContactCard
             icon={Mail}
             title="Email"
-            description="support@unieats.pk"
-            href="mailto:support@unieats.pk"
+            description={CONTACT_EMAIL}
+            href={`mailto:${CONTACT_EMAIL}`}
             action="Send Email"
           />
           <ContactCard
