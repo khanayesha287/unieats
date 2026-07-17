@@ -3,11 +3,11 @@
 import { useState } from "react";
 import {
   Clock,
-  Instagram,
   Mail,
   MapPin,
   MessageCircle,
   Send,
+  Camera,
 } from "lucide-react";
 import {
   CONTACT_EMAIL,
@@ -109,7 +109,7 @@ export default function ContactPageContent() {
             action="Message on WhatsApp"
           />
           <ContactCard
-            icon={Instagram}
+            icon={Camera}
             title="Instagram"
             description="@unieats_uet"
             href={INSTAGRAM_URL}
