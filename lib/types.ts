@@ -13,6 +13,7 @@ export interface Canteen {
   description: string;
   prepTime: string;
   gradient: string;
+  image?: string;
 }
 
 export interface MenuItem {

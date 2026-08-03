@@ -1,76 +1,84 @@
 import type { Order } from "@/lib/types";
 import { WHATSAPP_URL } from "@/lib/constants";
-import { formatOrderTime } from "@/lib/cart-utils";
+// import { formatOrderTime } from "@/lib/cart-utils"; // swap in below if it already returns "DD MMM YYYY, h:mm A"
 
-function formatCanteenBlock(order: Order, group: Order["canteenOrders"][number]): string {
-  const itemLines = group.items
-    .map((item) => `${item.name} ×${item.quantity}`)
-    .join("\n");
+/**
+ * Formats a timestamp as "19 Jul 2026, 6:45 PM".
+ * Replace the body with `return formatOrderTime(timestamp);`
+ * if your existing helper already outputs this exact combined format.
+ */
+function formatDateAndTime(timestamp: string | number | Date): string {
+  const date = new Date(timestamp);
+  const datePart = date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Karachi", // ensures correct time regardless of server location
+  });
+  const timePart = date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Karachi",
+  });
+  return `${datePart}, ${timePart}`;
+}
 
-  const lines = [
-    group.canteenName,
-    "",
-    "Student:",
-    order.studentName,
-    "",
-    "Registration:",
-    order.registrationNumber,
-    "",
-    "Phone:",
-    order.phone,
-    "",
-    "Items:",
-    itemLines,
-    "",
-    "Total:",
-    `Rs.${group.subtotal}`,
-  ];
-
-  return lines.join("\n");
+function formatItems(items: Order["canteenOrders"][number]["items"]): string[] {
+  return items.map((item) => `• ${item.name} ×${item.quantity}`);
 }
 
 export function formatWhatsAppOrderMessage(order: Order): string {
-  const orderTypeLabel =
-    order.orderType === "pickup" ? "Pickup" : "Delivery";
+  const orderTypeLabel = order.orderType === "pickup" ? "Pickup" : "Delivery";
+  const isMultiple = order.canteenOrders.length > 1;
 
-  const header = [
-    "🍔 New UniEats Order",
-    "",
-    `Order #: ${order.orderNumber}`,
-    `Time: ${formatOrderTime(order.timestamp)}`,
-    "",
-    "Order Type:",
-    orderTypeLabel,
-  ];
+  const lines: string[] = [];
+
+  // Header
+  lines.push("*New UniEats Order*");
+  lines.push(`• *Order:* ${order.orderNumber}`);
+  lines.push(`• *Date & Time:* ${formatDateAndTime(order.timestamp)}`);
+  lines.push(`• *Type:* ${orderTypeLabel}`);
 
   if (order.orderType === "delivery" && order.deliveryLocation) {
-    header.push("", "Delivery Location:", order.deliveryLocation);
+    lines.push(`• *Location:* ${order.deliveryLocation}`);
+  }
+
+  // Customer details shown once, up top, only when multiple canteens
+  if (isMultiple) {
+    lines.push(`• *Name:* ${order.studentName}`);
+    lines.push(`• *Reg No:* ${order.registrationNumber}`);
+    lines.push(`• *Phone:* ${order.phone}`);
   }
 
   if (order.specialInstructions) {
-    header.push("", "Special Instructions:", order.specialInstructions);
+    lines.push(`• *Instructions:* ${order.specialInstructions}`);
   }
 
-  const canteenBlocks = order.canteenOrders.map((group) =>
-    formatCanteenBlock(order, group),
-  );
+  // Canteen sections
+  order.canteenOrders.forEach((group) => {
+    lines.push(`*${group.canteenName}*`);
 
-  const footer: string[] = [];
+    // Single canteen: customer details go inside the canteen block
+    if (!isMultiple) {
+      lines.push(`• *Name:* ${order.studentName}`);
+      lines.push(`• *Reg No:* ${order.registrationNumber}`);
+      lines.push(`• *Phone:* ${order.phone}`);
+    }
 
+    lines.push(...formatItems(group.items));
+    lines.push(`• *Total:* Rs.${group.subtotal}`);
+  });
+
+  // Delivery fee + grand total
   if (order.deliveryFee > 0) {
-    footer.push(
-      "",
-      `Delivery Fee: Rs.${order.deliveryFee} (${order.canteenOrders.length} canteen${order.canteenOrders.length > 1 ? "s" : ""} × Rs.100)`,
-    );
+    lines.push(`• *Delivery Fee:* Rs.${order.deliveryFee}`);
+    lines.push(`• *Grand Total:* Rs.${order.grandTotal}`);
+  } else if (isMultiple) {
+    lines.push(`• *Grand Total:* Rs.${order.grandTotal}`);
   }
 
-  footer.push("", "Grand Total:", `Rs.${order.grandTotal}`, "", "Thank you for choosing UniEats.");
-
-  return [...header, "", "------------------------------------", "", ...canteenBlocks.flatMap((block, index) =>
-    index < canteenBlocks.length - 1
-      ? [block, "", "------------------------------------", ""]
-      : [block],
-  ), ...footer].join("\n");
+  return lines.join("\n");
 }
 
 export function buildWhatsAppUrl(message: string): string {

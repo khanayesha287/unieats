@@ -1,8 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Bike, Clock, Store } from "lucide-react";
 import { canteens } from "@/lib/data/canteens";
 
-const FEATURED_CANTEEN_NAMES = ["BSSC Canteen", "Bhola Canteen"];
+const FEATURED_CANTEEN_NAMES = ["SSC Canteen", "Bhola Canteen"];
 
 const featuredCanteens = canteens.filter((canteen) =>
   FEATURED_CANTEEN_NAMES.includes(canteen.name)
@@ -33,8 +34,17 @@ export default function Canteens() {
               key={canteen.slug}
               className="group flex flex-col overflow-hidden rounded-3xl border border-transparent bg-white shadow-lg shadow-[#6C2BD9]/5 transition-all duration-300 hover:-translate-y-2 hover:border-[#6C2BD9]/20 hover:shadow-xl hover:shadow-[#6C2BD9]/15"
             >
-              <div className={`relative h-44 bg-gradient-to-br ${canteen.gradient} border-t-4 border-[#6C2BD9]`}>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(244,197,66,0.25),transparent_50%)]" />
+              <div className={`relative h-44 overflow-hidden border-t-4 border-[#6C2BD9] ${canteen.image ? '' : `bg-gradient-to-br ${canteen.gradient}`}`}>
+                {canteen.image ? (
+                  <Image
+                    src={canteen.image}
+                    alt={canteen.name}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(244,197,66,0.25),transparent_50%)]" />
+                )}
                 <span className="absolute right-4 top-4 rounded-full bg-[#F4C542] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#2E1065]">
                   Open
                 </span>

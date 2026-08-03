@@ -2,11 +2,12 @@ import type { Canteen } from "@/lib/types";
 
 export const canteens: Canteen[] = [
   {
-    slug: "bssc",
-    name: "BSSC Canteen",
+    slug: "ssc",
+    name: "SSC Canteen",
     description: "Engineering students' favourite.",
     prepTime: "10–15 min",
     gradient: "from-[#6C2BD9] via-[#8B5CF6] to-[#A78BFA]",
+    image: "/ssc-building.jpg.jpeg",
   },
   {
     slug: "bhola",
@@ -14,6 +15,7 @@ export const canteens: Canteen[] = [
     description: "Burgers, Shawarma & Fast Food.",
     prepTime: "12–18 min",
     gradient: "from-[#7C3AED] via-[#6C2BD9] to-[#9333EA]",
+    image: "/bhola-building.jpg.jpeg",
   },
 ];
 

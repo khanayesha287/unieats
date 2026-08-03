@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 const menuItems = [
-  { name: "Chicken Biryani", price: 220, canteen: "BSSC Canteen", gradient: "from-[#6C2BD9]/30 to-[#F4C542]/40" },
-  { name: "Chicken Karahi", price: 450, canteen: "BSSC Canteen", gradient: "from-[#5B21B6]/30 to-[#F4C542]/40" },
+  { name: "Chicken Biryani", price: 220, canteen: "SSC Canteen", gradient: "from-[#6C2BD9]/30 to-[#F4C542]/40" },
+  { name: "Chicken Karahi", price: 450, canteen: "SSC Canteen", gradient: "from-[#5B21B6]/30 to-[#F4C542]/40" },
   { name: "Zinger Burger", price: 350, canteen: "Bhola Canteen", gradient: "from-[#7C3AED]/30 to-[#F4C542]/35" },
   { name: "Chicken Shawarma", price: 280, canteen: "Bhola Canteen", gradient: "from-[#6C2BD9]/25 to-[#F4C542]/30" },
   { name: "Loaded Fries", price: 250, canteen: "Bhola Canteen", gradient: "from-[#9333EA]/25 to-[#F4C542]/35" },
