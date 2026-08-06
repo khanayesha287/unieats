@@ -5,7 +5,6 @@ import { canteens } from "@/lib/data/canteens";
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes = [
     "",
-    "/canteens",
     "/menu",
     "/cart",
     "/checkout",

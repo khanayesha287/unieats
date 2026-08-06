@@ -1,12 +1,13 @@
+import Image from "next/image";
 import Link from "next/link";
+import { getMenuImage } from "@/lib/data/menus";
 
-const menuItems = [
-  { name: "Chicken Biryani", price: 220, canteen: "SSC Canteen", gradient: "from-[#6C2BD9]/30 to-[#F4C542]/40" },
-  { name: "Chicken Karahi", price: 450, canteen: "SSC Canteen", gradient: "from-[#5B21B6]/30 to-[#F4C542]/40" },
-  { name: "Zinger Burger", price: 350, canteen: "Bhola Canteen", gradient: "from-[#7C3AED]/30 to-[#F4C542]/35" },
-  { name: "Chicken Shawarma", price: 280, canteen: "Bhola Canteen", gradient: "from-[#6C2BD9]/25 to-[#F4C542]/30" },
-  { name: "Loaded Fries", price: 250, canteen: "Bhola Canteen", gradient: "from-[#9333EA]/25 to-[#F4C542]/35" },
-  { name: "Fresh Juice", price: 150, canteen: "Bhola Canteen", gradient: "from-[#F4C542]/40 to-[#6C2BD9]/20" },
+const featuredItems = [
+  { name: "Chicken Biryani", canteen: "SSC Canteen", gradient: "from-[#6C2BD9]/30 to-[#F4C542]/40" },
+  { name: "Zinger Burger", canteen: "SSC Canteen", gradient: "from-[#5B21B6]/30 to-[#F4C542]/40" },
+  { name: "Mango Shake", canteen: "SSC Canteen", gradient: "from-[#9333EA]/25 to-[#F4C542]/35" },
+  { name: "Mayo Fries", canteen: "SSC Canteen", gradient: "from-[#F4C542]/25 to-[#6C2BD9]/20" },
+  { name: "Chicken Tikka Pizza", canteen: "SSC Canteen", gradient: "from-[#6C2BD9]/30 to-[#F4C542]/25" },
 ];
 
 export default function FeaturedMenu() {
@@ -29,12 +30,20 @@ export default function FeaturedMenu() {
         </header>
 
         <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {menuItems.map((item) => (
+          {featuredItems.map((item) => (
             <article
               key={item.name}
               className="group overflow-hidden rounded-3xl bg-white shadow-lg shadow-[#6C2BD9]/5 transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-xl hover:shadow-[#6C2BD9]/15"
             >
-              <div className={`relative h-40 bg-gradient-to-br ${item.gradient}`}>
+              <div className={`relative h-40 overflow-hidden bg-gradient-to-br ${item.gradient}`}>
+                <Image
+                  src={getMenuImage(item.name)}
+                  alt={item.name}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  className="object-cover object-center"
+                  loading="lazy"
+                />
                 <span className="absolute right-3 top-3 rounded-full bg-[#F4C542] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#2E1065] shadow-sm transition-shadow group-hover:shadow-[0_0_12px_rgba(244,197,66,0.6)]">
                   Popular
                 </span>
@@ -44,11 +53,11 @@ export default function FeaturedMenu() {
                 <h3 className="font-bold text-gray-900">{item.name}</h3>
                 <p className="mt-1 text-sm text-gray-500">{item.canteen}</p>
                 <div className="mt-3 flex items-center justify-between">
-                  <p className="text-lg font-bold text-[#6C2BD9]">Rs.{item.price}</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#6C2BD9]">Student Pick</p>
                   <p className="text-sm text-[#F4C542]" aria-label="5 out of 5 stars">★★★★★</p>
                 </div>
                 <Link
-                  href="/canteens"
+                  href="/menu/ssc"
                   className="mt-4 flex w-full items-center justify-center rounded-full bg-[#6C2BD9] py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-md"
                 >
                   Order Now

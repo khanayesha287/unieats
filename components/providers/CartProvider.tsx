@@ -48,8 +48,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    setItems(readStoredCart());
-    setIsHydrated(true);
+    const stored = readStoredCart();
+    const handle = requestAnimationFrame(() => {
+      setItems(stored);
+      setIsHydrated(true);
+    });
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   useEffect(() => {

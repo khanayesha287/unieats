@@ -35,23 +35,17 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-600">
-            UniEats lets students order food online from campus canteens while
+            UniEats lets students order food online from the SSC canteen while
             sitting in class. Choose Pickup or Campus Delivery and save your
             valuable time.
           </p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
-              href="/canteens"
+              href="/menu/ssc"
               className="rounded-full bg-[#6C2BD9] px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-1 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
             >
               Order Food
-            </Link>
-            <Link
-              href="/canteens"
-              className="rounded-full border-2 border-[#6C2BD9]/30 bg-white/80 px-8 py-4 text-sm font-semibold text-[#6C2BD9] backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#6C2BD9] hover:bg-white"
-            >
-              Browse Canteens
             </Link>
           </div>
 

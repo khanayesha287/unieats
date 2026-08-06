@@ -35,10 +35,10 @@ export default function CartPageContent() {
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Your cart is empty</h2>
           <p className="mt-3 text-gray-600">
-            Add delicious meals from your favorite campus canteens to get started.
+            Add delicious meals from the SSC menu to get started.
           </p>
           <Link
-            href="/canteens"
+            href="/menu/ssc"
             className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
           >
             Continue Shopping
@@ -80,6 +80,9 @@ export default function CartPageContent() {
 
                     <div className="min-w-0 flex-1">
                       <h3 className="text-lg font-bold text-gray-900">{item.name}</h3>
+                      {item.size && (
+                        <p className="mt-0.5 text-sm font-semibold text-gray-500">{item.size}</p>
+                      )}
                       <p className="mt-0.5 text-sm text-gray-500">{item.canteenName}</p>
                       <p className="mt-2 text-lg font-bold text-[#6C2BD9]">
                         {formatPrice(item.price)}
@@ -133,7 +136,7 @@ export default function CartPageContent() {
                 <dt>
                   Delivery Fee
                   <span className="block text-xs font-normal text-gray-400">
-                    Rs.{DELIVERY_FEE_PER_CANTEEN} per canteen at checkout
+                    Rs.{DELIVERY_FEE_PER_CANTEEN} per canteen
                   </span>
                 </dt>
                 <dd className="font-semibold text-gray-400">—</dd>

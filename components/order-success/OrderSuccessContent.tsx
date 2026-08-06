@@ -2,27 +2,56 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Clock, Home, UtensilsCrossed } from "lucide-react";
+import { CheckCircle2, Clock, Home, Star, UtensilsCrossed, X } from "lucide-react";
 import { formatPrice } from "@/lib/format";
 import { formatOrderTime } from "@/lib/cart-utils";
 import type { Order } from "@/lib/types";
 
 export default function OrderSuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [rating, setRating] = useState(5);
+  const [message, setMessage] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("unieats-last-order");
-      if (stored) {
-        setOrder(JSON.parse(stored) as Order);
+    const handle = requestAnimationFrame(() => {
+      try {
+        const stored = sessionStorage.getItem("unieats-last-order");
+        if (stored) {
+          setOrder(JSON.parse(stored) as Order);
+        }
+      } catch {
+        setOrder(null);
       }
-    } catch {
-      setOrder(null);
-    }
+    });
+    return () => cancelAnimationFrame(handle);
+  }, []);
+
+  useEffect(() => {
+    const handle = requestAnimationFrame(() => {
+      setIsModalOpen(true);
+    });
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   const orderNumber = order?.orderNumber ?? "UE-PENDING-001";
   const prepTime = "15–20 min";
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!message.trim()) {
+      return;
+    }
+
+    setFeedbackSent(true);
+    setName("");
+    setRating(5);
+    setMessage("");
+  };
+
+  const reviewPrompt = feedbackSent ? "Thank you for your feedback!" : "Enjoy your meal! We'd love to hear your feedback.";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
@@ -90,7 +119,7 @@ export default function OrderSuccessContent() {
                     <dd>
                       {group.items.map((item) => (
                         <span key={item.id} className="block">
-                          {item.name} ×{item.quantity}
+                          {item.name}{item.size ? ` (${item.size})` : ""} ×{item.quantity}
                         </span>
                       ))}
                     </dd>
@@ -120,6 +149,23 @@ export default function OrderSuccessContent() {
           </div>
         )}
 
+        <div className="mt-8 rounded-2xl border border-[#6C2BD9]/10 bg-[#FAF7FF] p-6 text-left shadow-sm">
+          <p className="text-sm font-semibold text-[#6C2BD9]">{reviewPrompt}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setFeedbackSent(false);
+                setIsModalOpen(true);
+              }}
+              className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6]"
+            >
+              Leave a Review
+            </button>
+            <p className="text-sm text-gray-600">Your feedback helps us improve the campus food experience.</p>
+          </div>
+        </div>
+
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
             href="/"
@@ -129,7 +175,7 @@ export default function OrderSuccessContent() {
             Back Home
           </Link>
           <Link
-            href="/canteens"
+            href="/menu/ssc"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-[#6C2BD9] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F3EDFF]"
           >
             <UtensilsCrossed className="h-4 w-4" aria-hidden />
@@ -137,6 +183,86 @@ export default function OrderSuccessContent() {
           </Link>
         </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 px-4 py-6">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl shadow-[#6C2BD9]/20 sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">How was your experience with UniEats?</h2>
+                <p className="mt-1 text-sm text-gray-600">Your feedback helps us improve our service.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="rounded-full p-2 text-gray-500 transition hover:bg-[#F3EDFF] hover:text-[#6C2BD9]"
+                aria-label="Close review dialog"
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </button>
+            </div>
+
+            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+              <div>
+                <label className="text-sm font-semibold text-gray-700" htmlFor="review-name">Name (optional)</label>
+                <input
+                  id="review-name"
+                  type="text"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none ring-0 focus:border-[#6C2BD9]"
+                  placeholder="Enter your name"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Rating</label>
+                <div className="mt-2 flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setRating(value)}
+                      className="rounded-full p-1 text-[#F4C542] transition hover:scale-110"
+                      aria-label={`Rate ${value} out of 5`}
+                    >
+                      <Star className={`h-6 w-6 ${value <= rating ? "fill-current" : "text-gray-300"}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-700" htmlFor="review-message">Review</label>
+                <textarea
+                  id="review-message"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  className="mt-2 min-h-28 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#6C2BD9]"
+                  placeholder="Share your feedback"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  Skip
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#5B21B6]"
+                >
+                  Submit Review
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

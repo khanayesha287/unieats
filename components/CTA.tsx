@@ -28,22 +28,16 @@ export default function CTA() {
           </h2>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/85">
-            Browse your favorite UET Lahore canteens, place your order in
-            seconds, and choose Pickup or Campus Delivery.
+            Browse the SSC menu, place your order in seconds, and choose Pickup
+            or Campus Delivery.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/canteens"
+              href="/menu/ssc"
               className="w-full rounded-full bg-white px-8 py-4 text-sm font-semibold text-[#6C2BD9] shadow-lg transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-[#F4C542] hover:text-[#2E1065] sm:w-auto"
             >
               Order Now
-            </Link>
-            <Link
-              href="/canteens"
-              className="w-full rounded-full border-2 border-white/40 bg-white/10 px-8 py-4 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white hover:bg-white/20 sm:w-auto"
-            >
-              Browse Canteens
             </Link>
           </div>
 

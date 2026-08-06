@@ -3,7 +3,10 @@ export type FoodCategory =
   | "fast-food"
   | "bbq"
   | "drinks"
-  | "snacks";
+  | "snacks"
+  | "shakes-and-juices"
+  | "chai-and-paratha"
+  | "desi-food";
 
 export type CategoryFilter = "all" | FoodCategory;
 
@@ -26,6 +29,8 @@ export interface MenuItem {
   available: boolean;
   canteenSlug: string;
   gradient: string;
+  image?: string;
+  sizes?: Record<string, number>;
 }
 
 export interface CartItem {
@@ -36,6 +41,7 @@ export interface CartItem {
   canteenSlug: string;
   canteenName: string;
   gradient: string;
+  size?: string;
 }
 
 export type OrderType = "pickup" | "delivery";

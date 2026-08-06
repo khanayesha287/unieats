@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Canteens from "@/components/Canteens";
 import Footer from "@/components/Footer";
+import Testimonials from "@/components/Testimonials";
 import { createMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createMetadata({
@@ -45,6 +46,7 @@ export default function Home() {
         <Canteens />
         <FeaturedMenu />
         <CTA />
+        <Testimonials />
       </main>
       <Footer />
     </>

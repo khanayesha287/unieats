@@ -78,8 +78,8 @@ export function buildOrder(
 
 export function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `UE-${timestamp}-${random}`;
+  const random = Math.random().toString(36).slice(2, 5).toUpperCase();
+  return `UE${timestamp.slice(-4)}${random}`;
 }
 
 export function formatOrderTime(isoTimestamp: string): string {

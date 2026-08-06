@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageShell from "@/components/ui/PageShell";
 import MenuPageContent from "@/components/menu/MenuPageContent";
+import SSCMenuPageContent from "@/components/menu/SSCMenuPageContent";
 import { createMetadata } from "@/lib/seo";
 import { getCanteenBySlug } from "@/lib/data/canteens";
 
@@ -45,7 +46,7 @@ export default async function CanteenMenuPage({ params }: MenuPageProps) {
     <>
       <Navbar />
       <PageShell>
-        <MenuPageContent canteenSlug={canteen} />
+        {canteen === "ssc" ? <SSCMenuPageContent /> : <MenuPageContent canteenSlug={canteen} />}
       </PageShell>
       <Footer />
     </>

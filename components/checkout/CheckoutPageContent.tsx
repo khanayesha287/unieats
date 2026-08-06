@@ -137,10 +137,10 @@ export default function CheckoutPageContent() {
             Add items to your cart before completing your order.
           </p>
           <Link
-            href="/canteens"
+            href="/menu/ssc"
             className="mt-8 inline-flex rounded-full bg-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
           >
-            Browse Canteens
+            Browse Menu
           </Link>
         </div>
       </div>
@@ -325,7 +325,7 @@ export default function CheckoutPageContent() {
                         className="flex items-start justify-between gap-3 text-sm"
                       >
                         <span className="text-gray-700">
-                          {item.quantity} × {item.name}
+                          {item.quantity} × {item.name}{item.size ? ` (${item.size})` : ""}
                         </span>
                         <span className="shrink-0 font-semibold text-gray-900">
                           {formatPrice(item.price * item.quantity)}

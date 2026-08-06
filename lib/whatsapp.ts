@@ -25,58 +25,41 @@ function formatDateAndTime(timestamp: string | number | Date): string {
 }
 
 function formatItems(items: Order["canteenOrders"][number]["items"]): string[] {
-  return items.map((item) => `• ${item.name} ×${item.quantity}`);
+  return items.map((item) => `• ${item.name}${item.size ? ` (${item.size})` : ""} ×${item.quantity}`);
 }
 
 export function formatWhatsAppOrderMessage(order: Order): string {
   const orderTypeLabel = order.orderType === "pickup" ? "Pickup" : "Delivery";
-  const isMultiple = order.canteenOrders.length > 1;
 
   const lines: string[] = [];
 
-  // Header
   lines.push("*New UniEats Order*");
-  lines.push(`• *Order:* ${order.orderNumber}`);
-  lines.push(`• *Date & Time:* ${formatDateAndTime(order.timestamp)}`);
-  lines.push(`• *Type:* ${orderTypeLabel}`);
+  lines.push(`*Order ID:* ${order.orderNumber}`);
+  lines.push(`*Date & Time:* ${formatDateAndTime(order.timestamp)}`);
+  lines.push(`*Order Type:* ${orderTypeLabel}`);
 
   if (order.orderType === "delivery" && order.deliveryLocation) {
-    lines.push(`• *Location:* ${order.deliveryLocation}`);
+    lines.push(`*Delivery Location:* ${order.deliveryLocation}`);
   }
 
-  // Customer details shown once, up top, only when multiple canteens
-  if (isMultiple) {
-    lines.push(`• *Name:* ${order.studentName}`);
-    lines.push(`• *Reg No:* ${order.registrationNumber}`);
-    lines.push(`• *Phone:* ${order.phone}`);
-  }
+  lines.push(`*Student Name:* ${order.studentName}`);
+  lines.push(`*Registration Number:* ${order.registrationNumber}`);
+  lines.push(`*Phone Number:* ${order.phone}`);
 
   if (order.specialInstructions) {
-    lines.push(`• *Instructions:* ${order.specialInstructions}`);
+    lines.push(`*Instructions:* ${order.specialInstructions}`);
   }
 
-  // Canteen sections
   order.canteenOrders.forEach((group) => {
-    lines.push(`*${group.canteenName}*`);
-
-    // Single canteen: customer details go inside the canteen block
-    if (!isMultiple) {
-      lines.push(`• *Name:* ${order.studentName}`);
-      lines.push(`• *Reg No:* ${order.registrationNumber}`);
-      lines.push(`• *Phone:* ${order.phone}`);
-    }
-
+    lines.push(`*Canteen:* ${group.canteenName}`);
     lines.push(...formatItems(group.items));
-    lines.push(`• *Total:* Rs.${group.subtotal}`);
   });
 
-  // Delivery fee + grand total
   if (order.deliveryFee > 0) {
-    lines.push(`• *Delivery Fee:* Rs.${order.deliveryFee}`);
-    lines.push(`• *Grand Total:* Rs.${order.grandTotal}`);
-  } else if (isMultiple) {
-    lines.push(`• *Grand Total:* Rs.${order.grandTotal}`);
+    lines.push(`*Delivery Fee:* Rs.${order.deliveryFee}`);
   }
+
+  lines.push(`*Grand Total:* Rs.${order.grandTotal}`);
 
   return lines.join("\n");
 }

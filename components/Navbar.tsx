@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 
 const navLinks = [
   { label: "Home", href: "/" },
-  { label: "Canteens", href: "/canteens" },
   { label: "Menu", href: "/menu" },
   { label: "Contact", href: "/contact" },
 ];
@@ -124,7 +123,7 @@ export default function Navbar() {
               Login
             </Link>
             <Link
-              href="/canteens"
+              href="/menu/ssc"
               className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
             >
               Order Now
@@ -232,7 +231,7 @@ export default function Navbar() {
               Login
             </Link>
             <Link
-              href="/canteens"
+              href="/menu/ssc"
               onClick={() => setMenuOpen(false)}
               className="rounded-full bg-[#6C2BD9] px-5 py-3 text-center text-sm font-semibold text-white transition-all hover:bg-[#F4C542] hover:text-[#2E1065]"
             >

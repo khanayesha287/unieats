@@ -11,7 +11,6 @@ import {
 
 const quickLinks = [
   { label: "Home", href: "/" },
-  { label: "Canteens", href: "/canteens" },
   { label: "Menu", href: "/menu" },
   { label: "Contact", href: "/contact" },
 ];
