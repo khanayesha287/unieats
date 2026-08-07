@@ -29,8 +29,7 @@ const faqs = [
   },
   {
     question: "What are your operating hours?",
-    answer:
-      "UniEats follows campus canteen hours, typically Monday to Friday from 8:00 AM to 6:00 PM.",
+    answer: "SSC Canteen is open daily from 7:00 AM to 12:00 AM.",
   },
   {
     question: "How can I get help with my order?",

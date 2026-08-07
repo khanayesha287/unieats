@@ -11,14 +11,13 @@ import type { CategoryFilter, MenuItem } from "@/lib/types";
 
 const fastFoodSections = [
   { slug: "burgers", label: "Burgers" },
-  { slug: "rolls", label: "Rolls" },
-  { slug: "fries", label: "Fries" },
-  { slug: "nuggets", label: "Nuggets" },
-  { slug: "chicken-piece", label: "Chicken Piece" },
+  { slug: "shawarma-rolls", label: "Shawarma & Rolls" },
+  { slug: "fried-chicken", label: "Fried Chicken" },
+  { slug: "fries-sides", label: "Fries & Sides" },
   { slug: "sandwiches", label: "Sandwiches" },
+  { slug: "deals", label: "Deals" },
   { slug: "pizza", label: "Pizza" },
   { slug: "pizza-deals", label: "Pizza Deals" },
-  { slug: "other-deals", label: "Other Deals" },
 ];
 
 function getFastFoodSectionSlug(item: MenuItem): string {
@@ -26,7 +25,7 @@ function getFastFoodSectionSlug(item: MenuItem): string {
   const id = item.id.toLowerCase();
 
   if (id.startsWith("ssc-fast-deal-")) {
-    return "other-deals";
+    return "deals";
   }
   if (id.startsWith("ssc-pizza-deal-")) {
     return "pizza-deals";
@@ -34,26 +33,23 @@ function getFastFoodSectionSlug(item: MenuItem): string {
   if (id.startsWith("ssc-pizza-")) {
     return "pizza";
   }
-  if (name.includes("burger") || name.includes("zinger")) {
+  if (name.includes("burger") || name.includes("zinger") || name.includes("pizza burger")) {
     return "burgers";
   }
-  if (name.includes("roll") || name.includes("shawarma")) {
-    return "rolls";
+  if (name.includes("shawarma") || name.includes("roll")) {
+    return "shawarma-rolls";
+  }
+  if (name.includes("wing") || name.includes("nugget") || name.includes("chicken piece")) {
+    return "fried-chicken";
   }
   if (name.includes("fries") || name.includes("pasta")) {
-    return "fries";
-  }
-  if (name.includes("nugget") || name.includes("wing")) {
-    return "nuggets";
-  }
-  if (name.includes("chicken piece")) {
-    return "chicken-piece";
+    return "fries-sides";
   }
   if (name.includes("sandwich") || name.includes("panini")) {
     return "sandwiches";
   }
 
-  return "sandwiches"; // fallback
+  return "sandwiches";
 }
 
 export default function AllMenuPageContent() {
@@ -107,60 +103,6 @@ export default function AllMenuPageContent() {
 
   return (
     <>
-      {category === "fast-food" && (
-        <div className="sticky top-20 z-30 -mx-4 border-b border-[#6C2BD9]/10 bg-white/95 py-3 shadow-sm backdrop-blur-md sm:-mx-6 lg:-mx-8">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <nav className="flex overflow-x-auto gap-2 pb-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" aria-label="Fast food categories">
-              {fastFoodSections.map((sec) => {
-                const sectionItems = filteredItems.filter(
-                  (item) => getFastFoodSectionSlug(item) === sec.slug
-                );
-
-                // Only display section button if there are matching search items in it
-                if (sectionItems.length === 0) return null;
-
-                const isActive = activeSection === sec.slug;
-
-                return (
-                  <a
-                    key={sec.slug}
-                    href={`#${sec.slug}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setActiveSection(sec.slug);
-                      document.getElementById(sec.slug)?.scrollIntoView({ behavior: "smooth" });
-                    }}
-                    className={`snap-start shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-all duration-200 ${
-                      isActive
-                        ? "bg-[#6C2BD9] text-white shadow-sm"
-                        : "border border-gray-200 bg-white text-gray-700 hover:border-[#6C2BD9]/30 hover:text-[#6C2BD9]"
-                    }`}
-                  >
-                    {sec.label}
-                  </a>
-                );
-              })}
-            </nav>
-            <div className="mt-4 flex justify-center">
-              <button
-                type="button"
-                onClick={() => {
-                  const section = fastFoodSections.find((sec) =>
-                    filteredItems.some((item) => getFastFoodSectionSlug(item) === sec.slug),
-                  );
-                  if (section) {
-                    document.getElementById(section.slug)?.scrollIntoView({ behavior: "smooth" });
-                  }
-                }}
-                aria-label="Scroll to menu items"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#6C2BD9] shadow-lg shadow-[#6C2BD9]/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[#6C2BD9]/15 focus:outline-none focus:ring-2 focus:ring-[#6C2BD9]/30"
-              >
-                <ChevronDown className="h-5 w-5" aria-hidden />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
         <div className="mb-8 flex flex-col gap-6">
@@ -234,11 +176,24 @@ export default function AllMenuPageContent() {
 
                 if (sectionItems.length === 0) return null;
 
+                const categoryImage = sectionItems[0]?.image ?? "/menu/placeholder.jpg";
+
                 return (
                   <div key={sec.slug} id={sec.slug} className="scroll-mt-[140px] space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
-                      {sec.label}
-                    </h2>
+                    <div className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          {sec.label}
+                        </h2>
+                      </div>
+                      <div className="h-24 w-full overflow-hidden rounded-3xl border border-gray-200 bg-gray-100 sm:w-44">
+                        <img
+                          src={categoryImage}
+                          alt={`${sec.label} image`}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </div>
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                       {sectionItems.map((item) => (
                         <FoodCard key={item.id} item={item} />

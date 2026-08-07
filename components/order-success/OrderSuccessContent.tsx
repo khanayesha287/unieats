@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Clock, Home, Star, UtensilsCrossed, X } from "lucide-react";
+import { CheckCircle2, Clock, Home, UtensilsCrossed, X } from "lucide-react";
 import { formatPrice } from "@/lib/format";
 import { formatOrderTime } from "@/lib/cart-utils";
 import type { Order } from "@/lib/types";
@@ -11,7 +11,6 @@ import { buildWhatsAppReviewMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 export default function OrderSuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [rating, setRating] = useState(5);
   const [message, setMessage] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
 
@@ -47,11 +46,10 @@ export default function OrderSuccessContent() {
       return;
     }
 
-    const whatsappUrl = buildWhatsAppUrl(buildWhatsAppReviewMessage(rating, trimmedMessage));
+    const whatsappUrl = buildWhatsAppUrl(buildWhatsAppReviewMessage(trimmedMessage));
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
 
     setFeedbackSent(true);
-    setRating(5);
     setMessage("");
     setIsModalOpen(false);
   };
@@ -195,8 +193,7 @@ export default function OrderSuccessContent() {
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl shadow-[#6C2BD9]/20 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">How was your experience with UniEats?</h2>
-                <p className="mt-1 text-sm text-gray-600">Your feedback helps us improve our service.</p>
+                <h2 className="text-xl font-bold text-gray-900">Review</h2>
               </div>
               <button
                 type="button"
@@ -210,30 +207,13 @@ export default function OrderSuccessContent() {
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               <div>
-                <label className="text-sm font-semibold text-gray-700">Rating</label>
-                <div className="mt-2 flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setRating(value)}
-                      className="rounded-full p-1 text-[#F4C542] transition hover:scale-110"
-                      aria-label={`Rate ${value} out of 5`}
-                    >
-                      <Star className={`h-6 w-6 ${value <= rating ? "fill-current" : "text-gray-300"}`} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
                 <label className="text-sm font-semibold text-gray-700" htmlFor="review-message">Review</label>
                 <textarea
                   id="review-message"
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   className="mt-2 min-h-28 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#6C2BD9]"
-                  placeholder="Share your feedback"
+                  placeholder="Write your review here..."
                   required
                 />
               </div>
@@ -244,7 +224,7 @@ export default function OrderSuccessContent() {
                   onClick={() => setIsModalOpen(false)}
                   className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                 >
-                  Skip
+                  Cancel
                 </button>
                 <button
                   type="submit"

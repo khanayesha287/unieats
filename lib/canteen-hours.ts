@@ -7,8 +7,8 @@ export interface SscCanteenStatus {
   operatingHours: string;
 }
 
-const OPENING_HOUR = 6;
-const OPERATING_HOURS = "6:00 AM – 12:00 AM";
+const OPENING_HOUR = 7;
+const OPERATING_HOURS = "7:00 AM – 12:00 AM";
 
 export function getSscCanteenStatus(date = new Date()): SscCanteenStatus {
   const formatter = new Intl.DateTimeFormat("en-PK", {

@@ -134,9 +134,9 @@ export default function CartPageContent() {
               </div>
               <div className="flex justify-between text-gray-600">
                 <dt>
-                  Delivery Fee
+                  Delivery Charges
                   <span className="block text-xs font-normal text-gray-400">
-                    Rs.{DELIVERY_FEE_PER_CANTEEN} per canteen
+                    Rs.{DELIVERY_FEE_PER_CANTEEN} per order
                   </span>
                 </dt>
                 <dd className="font-semibold text-gray-400">—</dd>

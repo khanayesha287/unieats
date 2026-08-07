@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { CartProvider } from "@/components/providers/CartProvider";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import { rootMetadata } from "@/lib/seo";
 import {
   getOrganizationJsonLd,
@@ -33,6 +35,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full scroll-smooth antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        <Script
+          id="gtag-js"
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+        />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}', { page_path: window.location.pathname });`}
+        </Script>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -45,7 +55,10 @@ export default function RootLayout({
             __html: JSON.stringify(getWebsiteJsonLd()),
           }}
         />
-        <CartProvider>{children}</CartProvider>
+        <CartProvider>
+          <GoogleAnalytics />
+          {children}
+        </CartProvider>
       </body>
     </html>
   );

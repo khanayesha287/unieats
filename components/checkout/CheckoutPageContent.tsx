@@ -350,10 +350,10 @@ export default function CheckoutPageContent() {
               </div>
               <div className="flex justify-between text-gray-600">
                 <dt>
-                  Delivery Fee
-                  {form.orderType === "delivery" && canteenGroups.length > 0 && (
+                  Delivery Charges
+                  {form.orderType === "delivery" && (
                     <span className="block text-xs font-normal text-gray-400">
-                      {canteenGroups.length} canteen{canteenGroups.length > 1 ? "s" : ""} × Rs.{DELIVERY_FEE_PER_CANTEEN}
+                      Rs.{DELIVERY_FEE_PER_CANTEEN} per order
                     </span>
                   )}
                 </dt>

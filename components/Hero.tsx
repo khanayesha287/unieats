@@ -30,14 +30,15 @@ export default function Hero() {
             id="hero-heading"
             className="mt-6 text-4xl font-bold leading-tight tracking-tight text-gray-900 sm:text-5xl lg:text-6xl"
           >
-            Skip the Queue.{" "}
-            <span className="text-[#6C2BD9]">Order</span> Before Class Ends.
+            Skip The Waiting Time
           </h1>
 
+          <p className="mt-6 text-3xl font-bold leading-tight tracking-tight text-[#6C2BD9] sm:text-5xl lg:text-6xl">
+            Order While Sitting In Class
+          </p>
+
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-600">
-            UniEats lets students order food online from the SSC canteen while
-            sitting in class. Choose Pickup or Campus Delivery and save your
-            valuable time.
+            Uni Eats is making food ordering easy for students, teachers and staff. Order online and get your food delivered to your department, hostel or anywhere on campus. Just order, we’ll deliver.
           </p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-4">
