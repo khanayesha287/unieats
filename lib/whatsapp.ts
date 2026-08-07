@@ -67,3 +67,20 @@ export function formatWhatsAppOrderMessage(order: Order): string {
 export function buildWhatsAppUrl(message: string): string {
   return `${WHATSAPP_URL}?text=${encodeURIComponent(message)}`;
 }
+
+export function buildWhatsAppReviewMessage(rating: number, review: string): string {
+  const stars = "⭐".repeat(Math.max(1, Math.min(5, rating)));
+
+  return [
+    "--------------------------------",
+    "",
+    "• New UniEats Review",
+    "",
+    `**Rating:** ${stars}`,
+    "",
+    "**Review:**",
+    review,
+    "",
+    "--------------------------------",
+  ].join("\n");
+}

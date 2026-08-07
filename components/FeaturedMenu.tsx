@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import { getMenuImage } from "@/lib/data/menus";
 
 const featuredItems = [
@@ -11,6 +14,8 @@ const featuredItems = [
 ];
 
 export default function FeaturedMenu() {
+  const { isOpen } = useSscCanteenStatus();
+
   return (
     <section
       className="relative overflow-hidden bg-gradient-to-b from-[#F3EDFF] via-white to-[#FAF7FF] py-20 lg:py-28"
@@ -56,12 +61,18 @@ export default function FeaturedMenu() {
                   <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#6C2BD9]">Student Pick</p>
                   <p className="text-sm text-[#F4C542]" aria-label="5 out of 5 stars">★★★★★</p>
                 </div>
-                <Link
-                  href="/menu/ssc"
-                  className="mt-4 flex w-full items-center justify-center rounded-full bg-[#6C2BD9] py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-md"
-                >
-                  Order Now
-                </Link>
+                {isOpen ? (
+                  <Link
+                    href="/menu/ssc"
+                    className="mt-4 flex w-full items-center justify-center rounded-full bg-[#6C2BD9] py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-md"
+                  >
+                    Order Now
+                  </Link>
+                ) : (
+                  <span className="mt-4 flex w-full items-center justify-center rounded-full bg-gray-200 py-2.5 text-sm font-semibold text-gray-600">
+                    Closed
+                  </span>
+                )}
               </div>
             </article>
           ))}

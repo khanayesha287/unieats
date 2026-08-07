@@ -1,6 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Coffee, Milk, Sandwich, Soup } from "lucide-react";
+import SscCanteenStatus from "@/components/ui/SscCanteenStatus";
+import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import { getCanteenBySlug } from "@/lib/data/canteens";
 
 const categories = [
@@ -40,6 +44,7 @@ const categories = [
 
 export default function SSCMenuPageContent() {
   const canteen = getCanteenBySlug("ssc");
+  const { isOpen } = useSscCanteenStatus();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -57,16 +62,16 @@ export default function SSCMenuPageContent() {
         </div>
       </div>
 
+      <div className="mb-8">
+        <SscCanteenStatus className="max-w-fit" />
+      </div>
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         {categories.map((category) => {
           const Icon = category.icon;
 
-          return (
-            <Link
-              key={category.slug}
-              href={`/menu/ssc/${category.slug}`}
-              className="group overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-lg shadow-[#6C2BD9]/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-[#6C2BD9]/20"
-            >
+          const cardContent = (
+            <div className="group overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-lg shadow-[#6C2BD9]/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-[#6C2BD9]/20">
               <div className={`relative h-40 overflow-hidden bg-gradient-to-br ${category.gradient}`}>
                 <Image
                   src={category.image}
@@ -81,7 +86,7 @@ export default function SSCMenuPageContent() {
                   <Icon className="h-7 w-7" aria-hidden />
                 </div>
                 <span className="absolute bottom-4 left-5 rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#2E1065]">
-                  Open now
+                  {isOpen ? "Open now" : "Closed"}
                 </span>
               </div>
 
@@ -95,7 +100,17 @@ export default function SSCMenuPageContent() {
                   <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
                 </div>
               </div>
+            </div>
+          );
+
+          return isOpen ? (
+            <Link key={category.slug} href={`/menu/ssc/${category.slug}`}>
+              {cardContent}
             </Link>
+          ) : (
+            <div key={category.slug} aria-disabled="true" className="cursor-not-allowed opacity-80">
+              {cardContent}
+            </div>
           );
         })}
       </div>

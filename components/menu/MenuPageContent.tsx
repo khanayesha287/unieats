@@ -6,9 +6,9 @@ import { ArrowLeft } from "lucide-react";
 import FoodCard from "@/components/menu/FoodCard";
 import ComingSoonCard from "@/components/menu/ComingSoonCard";
 import FloatingCart from "@/components/ui/FloatingCart";
+import SscCanteenStatus from "@/components/ui/SscCanteenStatus";
 import { FOOD_CATEGORIES } from "@/lib/constants";
 import { getMenuByCanteen } from "@/lib/data/menus";
-import { getCanteenBySlug } from "@/lib/data/canteens";
 import type { CategoryFilter, MenuItem } from "@/lib/types";
 
 interface MenuPageContentProps {
@@ -64,7 +64,6 @@ function getFastFoodSectionSlug(item: MenuItem): string {
 }
 
 export default function MenuPageContent({ canteenSlug, initialCategory = "all" }: MenuPageContentProps) {
-  const canteen = getCanteenBySlug(canteenSlug);
   const [category, setCategory] = useState<CategoryFilter>(initialCategory);
   const [activeSection, setActiveSection] = useState<string>("burgers");
 
@@ -167,6 +166,8 @@ export default function MenuPageContent({ canteenSlug, initialCategory = "all" }
                 Browse your favourite food categories and order instantly.
               </p>
             </div>
+
+            <SscCanteenStatus className="max-w-fit" />
 
             <nav className="flex flex-wrap gap-2">
               {FOOD_CATEGORIES.map((entry) => {

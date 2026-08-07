@@ -6,11 +6,11 @@ import { CheckCircle2, Clock, Home, Star, UtensilsCrossed, X } from "lucide-reac
 import { formatPrice } from "@/lib/format";
 import { formatOrderTime } from "@/lib/cart-utils";
 import type { Order } from "@/lib/types";
+import { buildWhatsAppReviewMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export default function OrderSuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [name, setName] = useState("");
   const [rating, setRating] = useState(5);
   const [message, setMessage] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
@@ -41,17 +41,23 @@ export default function OrderSuccessContent() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!message.trim()) {
+
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
       return;
     }
 
+    const whatsappUrl = buildWhatsAppUrl(buildWhatsAppReviewMessage(rating, trimmedMessage));
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+
     setFeedbackSent(true);
-    setName("");
     setRating(5);
     setMessage("");
+    setIsModalOpen(false);
   };
 
   const reviewPrompt = feedbackSent ? "Thank you for your feedback!" : "Enjoy your meal! We'd love to hear your feedback.";
+  const isSubmitDisabled = !message.trim();
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
@@ -204,18 +210,6 @@ export default function OrderSuccessContent() {
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               <div>
-                <label className="text-sm font-semibold text-gray-700" htmlFor="review-name">Name (optional)</label>
-                <input
-                  id="review-name"
-                  type="text"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none ring-0 focus:border-[#6C2BD9]"
-                  placeholder="Enter your name"
-                />
-              </div>
-
-              <div>
                 <label className="text-sm font-semibold text-gray-700">Rating</label>
                 <div className="mt-2 flex items-center gap-2">
                   {[1, 2, 3, 4, 5].map((value) => (
@@ -254,7 +248,8 @@ export default function OrderSuccessContent() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#5B21B6]"
+                  disabled={isSubmitDisabled}
+                  className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#5B21B6] disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
                   Submit Review
                 </button>

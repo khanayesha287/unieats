@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useSscCanteenStatus } from "@/lib/canteen-hours";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -18,6 +19,7 @@ function isNavActive(href: string, pathname: string): boolean {
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { isOpen } = useSscCanteenStatus();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -122,12 +124,18 @@ export default function Navbar() {
             >
               Login
             </Link>
-            <Link
-              href="/menu/ssc"
-              className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
-            >
-              Order Now
-            </Link>
+            {isOpen ? (
+              <Link
+                href="/menu/ssc"
+                className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
+              >
+                Order Now
+              </Link>
+            ) : (
+              <span className="rounded-full bg-[#6C2BD9]/70 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25">
+                Order Now
+              </span>
+            )}
           </div>
 
           <button
@@ -230,13 +238,19 @@ export default function Navbar() {
             >
               Login
             </Link>
-            <Link
-              href="/menu/ssc"
-              onClick={() => setMenuOpen(false)}
-              className="rounded-full bg-[#6C2BD9] px-5 py-3 text-center text-sm font-semibold text-white transition-all hover:bg-[#F4C542] hover:text-[#2E1065]"
-            >
-              Order Now
-            </Link>
+            {isOpen ? (
+              <Link
+                href="/menu/ssc"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-full bg-[#6C2BD9] px-5 py-3 text-center text-sm font-semibold text-white transition-all hover:bg-[#F4C542] hover:text-[#2E1065]"
+              >
+                Order Now
+              </Link>
+            ) : (
+              <span className="rounded-full bg-[#6C2BD9]/70 px-5 py-3 text-center text-sm font-semibold text-white">
+                Order Now
+              </span>
+            )}
           </div>
         </div>
       </div>

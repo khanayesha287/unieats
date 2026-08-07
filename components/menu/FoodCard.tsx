@@ -5,6 +5,7 @@ import { useState } from "react";
 import StarRating from "@/components/ui/StarRating";
 import QuantitySelector from "@/components/ui/QuantitySelector";
 import { useCart } from "@/components/providers/CartProvider";
+import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import type { MenuItem } from "@/lib/types";
 import { getCanteenName } from "@/lib/data/canteens";
 import { getMenuImage } from "@/lib/data/menus";
@@ -15,6 +16,7 @@ interface FoodCardProps {
 
 export default function FoodCard({ item }: FoodCardProps) {
   const { addItem } = useCart();
+  const { isOpen } = useSscCanteenStatus();
   const [quantity, setQuantity] = useState(1);
   const [imgError, setImgError] = useState(false);
 
@@ -31,6 +33,7 @@ export default function FoodCard({ item }: FoodCardProps) {
   const imageSrc = item.image ?? getMenuImage(item.name);
   const displaySrc = imgError ? "/menu/placeholder.jpg" : imageSrc;
   const currentPrice = hasSizes && selectedSize ? item.sizes![selectedSize] : item.price;
+  const isOrderingDisabled = !item.available || !isOpen;
 
   const handleAddToCart = () => {
     const finalPrice = currentPrice;
@@ -101,10 +104,10 @@ export default function FoodCard({ item }: FoodCardProps) {
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!item.available}
+              disabled={isOrderingDisabled}
               className="flex-1 rounded-full bg-[#6C2BD9] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[#6C2BD9]/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Add to Cart
+              {isOpen ? "Add to Cart" : "Closed"}
             </button>
           </div>
         </div>
@@ -180,10 +183,10 @@ export default function FoodCard({ item }: FoodCardProps) {
           <button
             type="button"
             onClick={handleAddToCart}
-            disabled={!item.available}
+            disabled={isOrderingDisabled}
             className="flex-1 rounded-full bg-[#6C2BD9] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[#6C2BD9]/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Add to Cart
+            {isOpen ? "Add to Cart" : "Closed"}
           </button>
         </div>
       </div>
