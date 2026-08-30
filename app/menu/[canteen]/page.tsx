@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageShell from "@/components/ui/PageShell";
-import MenuPageContent from "@/components/menu/MenuPageContent";
 import SSCMenuPageContent from "@/components/menu/SSCMenuPageContent";
+import GSCMenuPageContent from "@/components/menu/GSCMenuPageContent";
+import ComingSoonCanteenContent from "@/components/menu/ComingSoonCanteenContent";
+import AnnexeMenuPageContent from "@/components/menu/AnnexeMenuPageContent";
 import { createMetadata } from "@/lib/seo";
 import { getCanteenBySlug } from "@/lib/data/canteens";
 
@@ -46,7 +48,15 @@ export default async function CanteenMenuPage({ params }: MenuPageProps) {
     <>
       <Navbar />
       <PageShell>
-        {canteen === "ssc" ? <SSCMenuPageContent /> : <MenuPageContent canteenSlug={canteen} />}
+        {canteen === "ssc" ? (
+        <SSCMenuPageContent />
+      ) : canteen === "annexe" ? (
+        <AnnexeMenuPageContent />
+      ) : canteenData.status === "coming-soon" ? (
+        <ComingSoonCanteenContent canteen={canteenData} />
+      ) : (
+        <GSCMenuPageContent canteenSlug={canteen} />
+      )}
       </PageShell>
       <Footer />
     </>

@@ -7,44 +7,39 @@ function formatItems(items: Order["canteenOrders"][number]["items"]): string[] {
 
 export function formatWhatsAppOrderMessage(order: Order): string {
   const orderTypeLabel = order.orderType === "pickup" ? "Pickup" : "Delivery";
+  const paymentLabel = order.paymentMethod === "cod" ? "Cash on Delivery (COD)" : "Online Payment";
   const lines: string[] = [];
 
-  lines.push("• New UniEats Order");
+  lines.push("\u2022 New UniEats Order");
   lines.push("");
-  lines.push(`Order #${order.orderNumber}`);
+  lines.push("*Order No:* " + order.orderNumber);
   lines.push("");
-  lines.push(`Order Type: ${orderTypeLabel}`);
+  lines.push("*Name:* " + order.studentName);
+  lines.push("*Phone Number:* " + order.phone);
+  lines.push("*Department:* " + order.department);
+  lines.push("*Order Type:* " + orderTypeLabel);
 
   if (order.orderType === "delivery" && order.deliveryLocation) {
-    lines.push(`Delivery Location: ${order.deliveryLocation}`);
+    lines.push("*Delivery Location:* " + order.deliveryLocation);
   }
 
-  lines.push("");
-  lines.push("Student:");
-  lines.push(order.studentName);
-  lines.push("Registration:");
-  lines.push(order.registrationNumber);
-  lines.push("Phone:");
-  lines.push(order.phone);
+  lines.push("*Payment Method:* " + paymentLabel);
 
   order.canteenOrders.forEach((group) => {
     lines.push("");
-    lines.push(group.canteenName);
+    lines.push("*Canteen: " + group.canteenName + "*");
     lines.push("Items:");
     lines.push(...formatItems(group.items));
   });
 
   lines.push("");
-  lines.push("Total:");
-  lines.push(`Rs.${order.subtotal}`);
+  lines.push("Total: Rs." + order.subtotal);
 
   if (order.deliveryFee > 0) {
-    lines.push("Delivery Charges:");
-    lines.push(`Rs.${order.deliveryFee}`);
+    lines.push("Delivery Charges: Rs." + order.deliveryFee);
   }
 
-  lines.push("Grand Total:");
-  lines.push(`Rs.${order.grandTotal}`);
+  lines.push("Grand Total: Rs." + order.grandTotal);
 
   return lines.join("\n");
 }

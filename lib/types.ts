@@ -6,7 +6,8 @@ export type FoodCategory =
   | "snacks"
   | "shakes-and-juices"
   | "chai-and-paratha"
-  | "desi-food";
+  | "desi-food"
+  | "chinese-food";
 
 export type CategoryFilter = "all" | FoodCategory;
 
@@ -17,6 +18,7 @@ export interface Canteen {
   prepTime: string;
   gradient: string;
   image?: string;
+  status: "active" | "coming-soon";
 }
 
 export interface MenuItem {
@@ -47,14 +49,13 @@ export interface CartItem {
 export type OrderType = "pickup" | "delivery";
 
 export interface CheckoutFormData {
-  registrationNumber: string;
   studentName: string;
   phone: string;
   department: string;
   orderType: OrderType;
   deliveryLocation: string;
   specialInstructions: string;
-  paymentMethod: "cash-pickup" | "cash-delivery";
+  paymentMethod: "cod" | "online";
 }
 
 export interface CanteenOrderGroup {
@@ -67,13 +68,12 @@ export interface CanteenOrderGroup {
 export interface Order {
   orderNumber: string;
   studentName: string;
-  registrationNumber: string;
   phone: string;
   department: string;
   orderType: OrderType;
   deliveryLocation?: string;
   specialInstructions?: string;
-  paymentMethod: "cash-pickup" | "cash-delivery";
+  paymentMethod: "cod" | "online";
   canteenOrders: CanteenOrderGroup[];
   subtotal: number;
   deliveryFee: number;

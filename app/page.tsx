@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import Canteens from "@/components/Canteens";
 import Footer from "@/components/Footer";
 import Testimonials from "@/components/Testimonials";
 import { createMetadata } from "@/lib/seo";
@@ -18,6 +17,9 @@ const FeaturedMenu = dynamic(() => import("@/components/FeaturedMenu"), {
   loading: () => <SectionSkeleton />,
 });
 const CTA = dynamic(() => import("@/components/CTA"), {
+  loading: () => <SectionSkeleton />,
+});
+const Canteens = dynamic(() => import("@/components/Canteens"), {
   loading: () => <SectionSkeleton />,
 });
 

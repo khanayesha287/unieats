@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Coffee, Milk, Sandwich, Soup } from "lucide-react";
+import { ArrowRight, Coffee, Milk, Sandwich, Soup, UtensilsCrossed } from "lucide-react";
 import SscCanteenStatus from "@/components/ui/SscCanteenStatus";
 import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import { getCanteenBySlug } from "@/lib/data/canteens";
@@ -15,6 +15,7 @@ const categories = [
     icon: Sandwich,
     image: "/menu/fast-food-category.jpg.png",
     gradient: "from-[#6C2BD9]/30 via-[#6C2BD9]/20 to-[#F4C542]/25",
+    comingSoon: false,
   },
   {
     slug: "shakes-and-juices",
@@ -23,6 +24,7 @@ const categories = [
     icon: Milk,
     image: "/menu/shakes-juices-category.jpg.png",
     gradient: "from-[#F4C542]/35 via-[#F4C542]/20 to-[#6C2BD9]/25",
+    comingSoon: false,
   },
   {
     slug: "chai-and-paratha",
@@ -31,6 +33,7 @@ const categories = [
     icon: Coffee,
     image: "/menu/chai-paratha-category.jpg.png",
     gradient: "from-[#7C3AED]/25 via-[#A78BFA]/20 to-[#F4C542]/25",
+    comingSoon: false,
   },
   {
     slug: "desi-food",
@@ -39,8 +42,18 @@ const categories = [
     icon: Soup,
     image: "/menu/desi-food-category.jpg.png",
     gradient: "from-[#5B21B6]/25 via-[#6C2BD9]/20 to-[#A78BFA]/25",
+    comingSoon: false,
   },
-] as const;
+  {
+    slug: "chinese-food",
+    label: "Chinese Food",
+    description: "Coming soon — Chinese food items will be available shortly.",
+    icon: UtensilsCrossed,
+    image: "/menu/fast-food-category.jpg.png",
+    gradient: "from-[#EF4444]/25 via-[#F97316]/20 to-[#6C2BD9]/25",
+    comingSoon: true,
+  },
+];
 
 export default function SSCMenuPageContent() {
   const canteen = getCanteenBySlug("ssc");
@@ -102,6 +115,17 @@ export default function SSCMenuPageContent() {
               </div>
             </div>
           );
+
+          if (category.comingSoon) {
+            return (
+              <div key={category.slug} className="relative cursor-not-allowed">
+                <span className="absolute right-4 top-4 z-10 rounded-full bg-[#F4C542] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#2E1065] shadow-sm">
+                  Coming Soon
+                </span>
+                <div className="opacity-70">{cardContent}</div>
+              </div>
+            );
+          }
 
           return isOpen ? (
             <Link key={category.slug} href={`/menu/ssc/${category.slug}`}>

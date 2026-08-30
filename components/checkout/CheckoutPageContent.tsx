@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { DEPARTMENTS, DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
+import { DEPARTMENTS, DELIVERY_ACTUAL, DELIVERY_CHARGED } from "@/lib/constants";
 import { formatPrice } from "@/lib/format";
 import {
   buildOrder,
@@ -17,17 +17,17 @@ import {
   buildWhatsAppUrl,
   formatWhatsAppOrderMessage,
 } from "@/lib/whatsapp";
+import { saveOrderToSupabase } from "@/lib/supabase";
 import type { CheckoutFormData, OrderType } from "@/lib/types";
 
 const initialForm: CheckoutFormData = {
-  registrationNumber: "",
   studentName: "",
   phone: "",
   department: DEPARTMENTS[0],
   orderType: "pickup",
   deliveryLocation: "",
   specialInstructions: "",
-  paymentMethod: "cash-pickup",
+  paymentMethod: "cod",
 };
 
 type FormErrors = Partial<Record<keyof CheckoutFormData, string>>;
@@ -38,6 +38,7 @@ export default function CheckoutPageContent() {
   const [form, setForm] = useState<CheckoutFormData>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittedRef = useRef(false);
 
   const canteenGroups = useMemo(() => groupItemsByCanteen(items), [items]);
   const deliveryFee = calculateDeliveryFee(items, form.orderType);
@@ -45,7 +46,6 @@ export default function CheckoutPageContent() {
   const prepTime = "15–20 min";
 
   const isFormValid = useMemo(() => {
-    if (!form.registrationNumber.trim()) return false;
     if (!form.studentName.trim()) return false;
     if (!form.phone.trim()) return false;
     if (!form.department) return false;
@@ -58,9 +58,6 @@ export default function CheckoutPageContent() {
   const validate = (): FormErrors => {
     const nextErrors: FormErrors = {};
 
-    if (!form.registrationNumber.trim()) {
-      nextErrors.registrationNumber = "Registration number is required.";
-    }
     if (!form.studentName.trim()) {
       nextErrors.studentName = "Student name is required.";
     }
@@ -83,7 +80,6 @@ export default function CheckoutPageContent() {
     setForm((current) => ({
       ...current,
       orderType,
-      paymentMethod: orderType === "pickup" ? "cash-pickup" : "cash-delivery",
     }));
     setErrors((current) => ({
       ...current,
@@ -94,6 +90,9 @@ export default function CheckoutPageContent() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    // Duplicate-submission guard (ref survives re-renders)
+    if (submittedRef.current) return;
+
     const nextErrors = validate();
     setErrors(nextErrors);
 
@@ -101,6 +100,7 @@ export default function CheckoutPageContent() {
       return;
     }
 
+    submittedRef.current = true;
     setIsSubmitting(true);
 
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -111,6 +111,16 @@ export default function CheckoutPageContent() {
     const whatsappUrl = buildWhatsAppUrl(message);
 
     sessionStorage.setItem("unieats-last-order", JSON.stringify(order));
+
+    // Save to Supabase — fire-and-forget; never blocks the student
+    try {
+      await saveOrderToSupabase(order);
+    } catch (error) {
+      console.error(
+        "[UniEats] Supabase order save failed (WhatsApp flow continues):",
+        error,
+      );
+    }
 
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
     clearCart();
@@ -167,17 +177,6 @@ export default function CheckoutPageContent() {
           <h2 className="text-xl font-bold text-gray-900">Student Information</h2>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Field
-              id="registrationNumber"
-              label="Registration Number"
-              required
-              value={form.registrationNumber}
-              error={errors.registrationNumber}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, registrationNumber: value }))
-              }
-              placeholder="2023-CS-101"
-            />
             <Field
               id="studentName"
               label="Student Name"
@@ -353,7 +352,7 @@ export default function CheckoutPageContent() {
                   Delivery Charges
                   {form.orderType === "delivery" && (
                     <span className="block text-xs font-normal text-gray-400">
-                      Rs.{DELIVERY_FEE_PER_CANTEEN} per order
+                      <s>Rs. {DELIVERY_ACTUAL}</s>{" "}Rs. {DELIVERY_CHARGED}
                     </span>
                   )}
                 </dt>
@@ -380,23 +379,16 @@ export default function CheckoutPageContent() {
               <div className="space-y-2">
                 {(
                   [
-                    { value: "cash-pickup", label: "Cash on Pickup" },
-                    { value: "cash-delivery", label: "Cash on Delivery" },
-                  ] as const
+                    { value: "cod" as const, label: "Cash on Delivery (COD)", sub: "Pay when your food is delivered" },
+                    { value: "online" as const, label: "Online Payment", sub: "Pay online before your order is delivered" },
+                  ]
                 ).map((option) => (
                   <label
                     key={option.value}
-                    className={`flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 text-sm transition-all ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-all ${
                       form.paymentMethod === option.value
                         ? "border-[#6C2BD9] bg-[#F3EDFF] text-[#6C2BD9]"
                         : "border-gray-200 text-gray-700"
-                    } ${
-                      (option.value === "cash-pickup" &&
-                        form.orderType !== "pickup") ||
-                      (option.value === "cash-delivery" &&
-                        form.orderType !== "delivery")
-                        ? "hidden"
-                        : ""
                     }`}
                   >
                     <input
@@ -410,9 +402,12 @@ export default function CheckoutPageContent() {
                           paymentMethod: option.value,
                         }))
                       }
-                      className="accent-[#6C2BD9]"
+                      className="mt-0.5 accent-[#6C2BD9]"
                     />
-                    {option.label}
+                    <span>
+                      <span className="font-semibold">{option.label}</span>
+                      <span className="block text-xs font-normal text-gray-500 mt-0.5">{option.sub}</span>
+                    </span>
                   </label>
                 ))}
               </div>

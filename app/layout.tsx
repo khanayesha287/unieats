@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { CartProvider } from "@/components/providers/CartProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import { rootMetadata } from "@/lib/seo";
 import {
@@ -55,10 +56,12 @@ export default function RootLayout({
             __html: JSON.stringify(getWebsiteJsonLd()),
           }}
         />
-        <CartProvider>
-          <GoogleAnalytics />
-          {children}
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <GoogleAnalytics />
+            {children}
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );

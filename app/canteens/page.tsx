@@ -1,7 +1,23 @@
-import { redirect } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import PageShell from "@/components/ui/PageShell";
+import CanteensPageContent from "@/components/menu/CanteensPageContent";
+import { createMetadata } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+export const metadata = createMetadata({
+  title: "UET Lahore Canteens",
+  description: "Browse all UET Lahore campus canteens. Order online from SSC and GSSC canteens.",
+  path: "/canteens",
+});
 
 export default function CanteensPage() {
-  redirect("/menu/ssc");
+  return (
+    <>
+      <Navbar />
+      <PageShell>
+        <CanteensPageContent />
+      </PageShell>
+      <Footer />
+    </>
+  );
 }

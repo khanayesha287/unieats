@@ -111,10 +111,6 @@ export default function OrderSuccessContent() {
                     <dd>{order.studentName}</dd>
                   </div>
                   <div>
-                    <dt className="font-medium text-gray-900">Registration</dt>
-                    <dd>{order.registrationNumber}</dd>
-                  </div>
-                  <div>
                     <dt className="font-medium text-gray-900">Phone</dt>
                     <dd>{order.phone}</dd>
                   </div>

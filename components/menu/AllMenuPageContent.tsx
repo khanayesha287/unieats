@@ -139,7 +139,7 @@ export default function AllMenuPageContent() {
           </div>
 
           <div
-            className="flex flex-wrap gap-2"
+            className="flex gap-2 overflow-x-auto pb-1 scrollbar-none -mx-2 px-2 sm:mx-0 sm:flex-wrap sm:px-0"
             role="tablist"
             aria-label="Food categories"
           >
@@ -168,7 +168,7 @@ export default function AllMenuPageContent() {
 
         {filteredItems.length > 0 ? (
           category === "fast-food" ? (
-            <div className="space-y-12">
+            <div className="space-y-4">
               {fastFoodSections.map((sec) => {
                 const sectionItems = filteredItems.filter(
                   (item) => getFastFoodSectionSlug(item) === sec.slug
@@ -179,22 +179,11 @@ export default function AllMenuPageContent() {
                 const categoryImage = sectionItems[0]?.image ?? "/menu/placeholder.jpg";
 
                 return (
-                  <div key={sec.slug} id={sec.slug} className="scroll-mt-[140px] space-y-6">
-                    <div className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
-                          {sec.label}
-                        </h2>
-                      </div>
-                      <div className="h-24 w-full overflow-hidden rounded-3xl border border-gray-200 bg-gray-100 sm:w-44">
-                        <img
-                          src={categoryImage}
-                          alt={`${sec.label} image`}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <div key={sec.slug} id={sec.slug} className="scroll-mt-[140px]">
+                    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+                      <h2 className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50">
+                        {sec.label}
+                      </h2>
                       {sectionItems.map((item) => (
                         <FoodCard key={item.id} item={item} />
                       ))}
@@ -204,7 +193,7 @@ export default function AllMenuPageContent() {
               })}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
               {filteredItems.map((item) => (
                 <FoodCard key={item.id} item={item} />
               ))}

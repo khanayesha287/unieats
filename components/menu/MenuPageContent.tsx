@@ -16,129 +16,115 @@ interface MenuPageContentProps {
   initialCategory?: CategoryFilter;
 }
 
-const fastFoodSections = [
-  { slug: "burgers", label: "Burgers" },
-  { slug: "shawarma-rolls", label: "Shawarma & Rolls" },
-  { slug: "fried-chicken", label: "Fried Chicken" },
-  { slug: "fries-sides", label: "Fries & Sides" },
-  { slug: "sandwiches", label: "Sandwiches" },
-  { slug: "deals", label: "Deals" },
-  { slug: "pizza", label: "Pizza" },
-  { slug: "pizza-deals", label: "Pizza Deals" },
+// Fast Food subcategory definitions
+const fastFoodSubcategories = [
+  { slug: "burgers",        label: "Burgers",          emoji: "🍔" },
+  { slug: "pizza",          label: "Pizza",            emoji: "🍕" },
+  { slug: "sandwiches",     label: "Sandwiches",       emoji: "🥪" },
+  { slug: "shawarma-rolls", label: "Shawarma & Rolls", emoji: "🌯" },
+  { slug: "fries-sides",    label: "Fries & Sides",    emoji: "🍟" },
+  { slug: "fried-chicken",  label: "Wings & Chicken",  emoji: "🍗" },
+  { slug: "deals",          label: "Deals",            emoji: "🎁" },
+  { slug: "pizza-deals",    label: "Pizza Deals",      emoji: "🍕" },
 ];
 
-function getFastFoodSectionSlug(item: MenuItem): string {
+function getFastFoodSubSlug(item: MenuItem): string {
   const name = item.name.toLowerCase();
   const id = item.id.toLowerCase();
-
-  if (id.startsWith("ssc-fast-deal-")) {
-    return "deals";
-  }
-  if (id.startsWith("ssc-pizza-deal-")) {
-    return "pizza-deals";
-  }
-  if (id.startsWith("ssc-pizza-")) {
-    return "pizza";
-  }
-  if (name.includes("burger") || name.includes("zinger") || name.includes("pizza burger")) {
-    return "burgers";
-  }
-  if (name.includes("shawarma") || name.includes("roll")) {
-    return "shawarma-rolls";
-  }
-  if (name.includes("wing") || name.includes("nugget") || name.includes("chicken piece")) {
-    return "fried-chicken";
-  }
-  if (name.includes("fries") || name.includes("pasta")) {
-    return "fries-sides";
-  }
-  if (name.includes("sandwich") || name.includes("panini")) {
-    return "sandwiches";
-  }
-
+  if (id.startsWith("ssc-fast-deal-"))  return "deals";
+  if (id.startsWith("ssc-pizza-deal-")) return "pizza-deals";
+  if (id.startsWith("ssc-pizza-"))      return "pizza";
+  if (name.includes("burger") || name.includes("zinger")) return "burgers";
+  if (name.includes("shawarma") || name.includes("roll"))  return "shawarma-rolls";
+  if (name.includes("wing") || name.includes("nugget") || name.includes("chicken piece")) return "fried-chicken";
+  if (name.includes("fries") || name.includes("pasta"))    return "fries-sides";
+  if (name.includes("sandwich") || name.includes("panini")) return "sandwiches";
   return "sandwiches";
 }
 
 export default function MenuPageContent({ canteenSlug, initialCategory = "all" }: MenuPageContentProps) {
   const [category, setCategory] = useState<CategoryFilter>(initialCategory);
-  const [activeSection, setActiveSection] = useState<string>("burgers");
+  // null = show subcategory picker; string = show items for that subcategory
+  const [fastFoodSub, setFastFoodSub] = useState<string | null>(null);
 
   const items = useMemo(() => getMenuByCanteen(canteenSlug), [canteenSlug]);
-  const isComingSoonCategory = false;
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const matchesCategory = category === "all" || item.category === category;
-      return matchesCategory;
-    });
+    return items.filter((item) => category === "all" || item.category === category);
   }, [items, category]);
 
-  // Scroll spy effect to highlight active section on scroll
+  // Reset subcategory when switching away from fast-food
   useEffect(() => {
-    if (category !== "fast-food") return;
+    if (category !== "fast-food") setFastFoodSub(null);
+  }, [category]);
 
-    const observerOptions = {
-      root: null,
-      rootMargin: "-120px 0px -60% 0px", // offset for sticky main navbar + sub navbar
-      threshold: 0,
-    };
+  // Only show subcategories that actually have items
+  const availableSubcategories = useMemo(() => {
+    const ffItems = items.filter((i) => i.category === "fast-food");
+    return fastFoodSubcategories.filter((sub) =>
+      ffItems.some((item) => getFastFoodSubSlug(item) === sub.slug)
+    );
+  }, [items]);
 
-    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          requestAnimationFrame(() => {
-            setActiveSection(entry.target.id);
-          });
-        }
-      });
-    };
-
-    const observer = new IntersectionObserver(handleIntersection, observerOptions);
-
-    fastFoodSections.forEach((sec) => {
-      const el = document.getElementById(sec.slug);
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-  }, [category, filteredItems]);
+  // Items for the selected subcategory
+  const subItems = useMemo(() => {
+    if (category !== "fast-food" || !fastFoodSub) return [];
+    return filteredItems.filter((item) => getFastFoodSubSlug(item) === fastFoodSub);
+  }, [filteredItems, category, fastFoodSub]);
 
   return (
     <>
-
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+        {/* Header card */}
         <section className="animate-fade-up overflow-hidden rounded-[32px] bg-gradient-to-br from-[#F5F3FF] via-[#EDE9FE] to-[#DDD6FE] px-6 py-8 shadow-[0_30px_90px_-60px_rgba(115,65,255,0.16)] sm:px-8 sm:py-10">
           <div className="flex flex-col gap-5">
-            <Link
-              href="/menu/ssc"
-              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 bg-white/80 px-4 py-2 text-sm font-medium text-[#6C2BD9] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-              Back to Categories
-            </Link>
+            {/* Back nav */}
+            {fastFoodSub ? (
+              <button
+                type="button"
+                onClick={() => setFastFoodSub(null)}
+                className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 bg-white/80 px-4 py-2 text-sm font-medium text-[#6C2BD9] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden />
+                Back to Fast Food
+              </button>
+            ) : (
+              <Link
+                href="/menu/ssc"
+                className="inline-flex w-fit items-center gap-2 rounded-full border border-white/30 bg-white/80 px-4 py-2 text-sm font-medium text-[#6C2BD9] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden />
+                Back to Categories
+              </Link>
+            )}
 
             <div className="space-y-3">
               <h1 className="text-3xl font-bold tracking-tight text-[#1F2937] sm:text-4xl lg:text-5xl">
                 SSC Canteen Menu
               </h1>
               <p className="max-w-3xl text-base text-[#6B7280] sm:text-lg">
-                Browse your favourite food categories and order instantly.
+                {fastFoodSub
+                  ? (fastFoodSubcategories.find((s) => s.slug === fastFoodSub)?.label ?? "Fast Food")
+                  : "Browse your favourite food categories and order instantly."}
               </p>
             </div>
 
             <SscCanteenStatus className="max-w-fit" />
 
-            <nav className="flex flex-wrap gap-2">
+            {/* Category tabs */}
+            <nav className="flex gap-2 overflow-x-auto pb-1 scrollbar-none -mx-2 px-2 sm:mx-0 sm:flex-wrap sm:px-0">
               {FOOD_CATEGORIES.map((entry) => {
                 const isActive = category === entry.id;
-
                 return (
                   <button
                     key={entry.id}
                     type="button"
                     role="tab"
                     aria-selected={isActive}
-                    onClick={() => setCategory(entry.id)}
+                    onClick={() => {
+                      setCategory(entry.id);
+                      if (entry.id !== "fast-food") setFastFoodSub(null);
+                    }}
                     className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                       isActive
                         ? "bg-[#6C2BD9] text-white shadow-md shadow-[#6C2BD9]/25"
@@ -152,60 +138,54 @@ export default function MenuPageContent({ canteenSlug, initialCategory = "all" }
             </nav>
           </div>
         </section>
-        {isComingSoonCategory ? (
-          <ComingSoonCard />
-        ) : filteredItems.length > 0 ? (
-          category === "fast-food" ? (
-            <div className="space-y-12">
-              {fastFoodSections.map((sec) => {
-                const sectionItems = filteredItems.filter(
-                  (item) => getFastFoodSectionSlug(item) === sec.slug
-                );
 
-                if (sectionItems.length === 0) return null;
-
-                const categoryImage = sectionItems[0]?.image ?? "/menu/placeholder.jpg";
-
-                return (
-                  <div key={sec.slug} id={sec.slug} className="scroll-mt-[140px] space-y-6">
-                    <div className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
-                          {sec.label}
-                        </h2>
-                      </div>
-                      <div className="h-24 w-full overflow-hidden rounded-3xl border border-gray-200 bg-gray-100 sm:w-44">
-                        <img
-                          src={categoryImage}
-                          alt={`${sec.label} image`}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                      {sectionItems.map((item) => (
-                        <FoodCard key={item.id} item={item} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredItems.map((item) => (
-                <FoodCard key={item.id} item={item} />
+        {/* Content area */}
+        {category === "fast-food" && !fastFoodSub ? (
+          // Fast Food subcategory picker — 2-col mobile grid
+          <div className="mt-6">
+            <p className="mb-3 text-sm font-semibold text-white/70 uppercase tracking-wider">
+              Choose a subcategory
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {availableSubcategories.map((sub) => (
+                <button
+                  key={sub.slug}
+                  type="button"
+                  onClick={() => setFastFoodSub(sub.slug)}
+                  className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/20 bg-white/95 px-3 py-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:shadow-[#6C2BD9]/15 active:scale-95 min-h-[80px]"
+                >
+                  <span className="text-2xl leading-none" aria-hidden>{sub.emoji}</span>
+                  <span className="text-[13px] font-semibold text-gray-900 leading-tight">{sub.label}</span>
+                </button>
               ))}
             </div>
-          )
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="rounded-3xl border border-[#6C2BD9]/10 bg-white/80 p-12 text-center shadow-lg backdrop-blur-sm mt-6">
+            <p className="text-lg font-semibold text-gray-900">No items found</p>
+            <p className="mt-2 text-gray-600">Try a different search or category filter.</p>
+          </div>
+        ) : category === "fast-food" && fastFoodSub ? (
+          // Items for the selected fast-food subcategory
+          <div className="mt-6">
+            {subItems.length > 0 ? (
+              <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+                {subItems.map((item) => (
+                  <FoodCard key={item.id} item={item} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-[#6C2BD9]/10 bg-white/80 p-12 text-center shadow-lg backdrop-blur-sm">
+                <p className="text-lg font-semibold text-gray-900">No items in this subcategory</p>
+              </div>
+            )}
+          </div>
         ) : (
-          <div className="rounded-3xl border border-[#6C2BD9]/10 bg-white/80 p-12 text-center shadow-lg backdrop-blur-sm">
-            <p className="text-lg font-semibold text-gray-900">
-              No items found
-            </p>
-            <p className="mt-2 text-gray-600">
-              Try a different search or category filter.
-            </p>
+          // Non-fast-food categories — flat list
+          <div className="mt-6 overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+            {filteredItems.map((item) => (
+              <FoodCard key={item.id} item={item} />
+            ))}
           </div>
         )}
       </div>
