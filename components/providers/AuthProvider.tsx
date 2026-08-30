@@ -27,17 +27,14 @@ const PROFILE_CACHE_KEY = "unieats-staff-profile";
 
 async function fetchUserProfile(userId: string): Promise<StaffProfile | null> {
   if (!supabaseAuth) {
-    console.log('[AUTH DEBUG] fetchUserProfile: supabaseAuth is null');
     return null;
   }
-  console.log('[AUTH DEBUG] fetchUserProfile: querying staff_profiles for userId:', userId);
   const { data, error } = await supabaseAuth
     .from("staff_profiles")
     .select("id, email, name, role, canteen_id, active")
     .eq("id", userId)
     .maybeSingle();
 
-  console.log('[AUTH DEBUG] fetchUserProfile result:', { data, error: error?.message ?? null });
   if (error || !data) return null;
 
   return {
@@ -94,11 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabaseAuth.auth
       .getSession()
       .then(({ data: { session } }) => {
-        console.log('[AUTH DEBUG] Init getSession:', { hasSession: !!session, userId: session?.user?.id });
         setUser(session?.user ?? null);
         if (session?.user) {
           fetchUserProfile(session.user.id).then((p) => {
-            console.log('[AUTH DEBUG] Init profile fetch done:', { hasProfile: !!p, role: p?.role });
             setProfile(p);
             if (p && typeof window !== "undefined") {
               try {
@@ -120,7 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabaseAuth.auth.onAuthStateChange((_event, session) => {
-      console.log('[AUTH DEBUG] onAuthStateChange:', { event: _event, hasUser: !!session?.user, userId: session?.user?.id });
       setUser(session?.user ?? null);
       if (!session?.user) {
         setProfile(null);
@@ -153,51 +147,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string): Promise<{ error: string | null }> => {
       if (!supabaseAuth) {
-        console.log('[AUTH DEBUG] signIn: supabaseAuth is null - service unavailable');
         return { error: "Authentication service unavailable" };
       }
 
-      console.log('[AUTH DEBUG] signIn: calling supabase.signInWithPassword for', email);
       const { data, error } = await supabaseAuth.auth.signInWithPassword({
         email,
         password,
       });
 
-      console.log('[AUTH DEBUG] signIn: Supabase result:', { hasUser: !!data?.user, error: error?.message ?? null });
 
       if (error) {
-        console.log('[AUTH DEBUG] signIn: Supabase auth error:', error.message);
         return { error: error.message };
       }
       if (!data.user) {
-        console.log('[AUTH DEBUG] signIn: No user returned from Supabase');
         return { error: "Login failed" };
       }
 
-      console.log('[AUTH DEBUG] signIn: Auth user:', { id: data.user.id, email: data.user.email });
 
-      const session = await supabaseAuth.auth.getSession();
-      console.log('[AUTH DEBUG] signIn: Session after login:', { hasSession: !!session?.data?.session });
 
-      console.log('[AUTH DEBUG] signIn: Fetching staff profile...');
       const p = await fetchUserProfile(data.user.id);
-      console.log('[AUTH DEBUG] signIn: Staff profile:', p);
 
       if (!p) {
-        console.log('[AUTH DEBUG] signIn: NO staff profile found - signing out');
         await supabaseAuth.auth.signOut();
         return { error: "No staff profile found. Contact an administrator." };
       }
 
-      console.log('[AUTH DEBUG] signIn: Role:', p.role, '| Active:', p.active);
 
       if (!p.active) {
-        console.log('[AUTH DEBUG] signIn: Account is deactivated - signing out');
         await supabaseAuth.auth.signOut();
         return { error: "Your account has been deactivated. Contact an administrator." };
       }
 
-      console.log('[AUTH DEBUG] signIn: Setting user and profile state');
       setUser(data.user);
       setProfile(p);
       if (typeof window !== "undefined") {
@@ -208,7 +188,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      console.log('[AUTH DEBUG] signIn: SUCCESS - returning null error');
       return { error: null };
     },
     [],

@@ -26,10 +26,8 @@ function LoginForm() {
 
   // If already logged in with a profile, redirect
   useEffect(() => {
-    console.log('[AUTH DEBUG] Redirect useEffect fired:', { authLoading, hasProfile: !!profile, role: profile?.role, redirect });
     if (!authLoading && profile) {
       const target = redirect || getRedirectForRole(profile.role);
-      console.log('[AUTH DEBUG] Redirecting to:', target);
       router.replace(target);
     }
   }, [authLoading, profile, redirect, router]);
@@ -38,18 +36,14 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-    console.log('[AUTH DEBUG] Login submit started', { email, redirect });
 
     const { error: signInError } = await signIn(email, password);
-    console.log('[AUTH DEBUG] signIn() returned:', { error: signInError });
     if (signInError) {
-      console.log('[AUTH DEBUG] Login FAILED with error:', signInError);
       setError(signInError);
       setIsSubmitting(false);
       return;
     }
 
-    console.log('[AUTH DEBUG] Login succeeded, waiting for profile state update...');
     setIsSubmitting(false);
   };
 
