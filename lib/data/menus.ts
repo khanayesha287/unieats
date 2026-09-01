@@ -40,6 +40,7 @@ const menuImageMap: Record<string, string> = {
   "Khajoor Shake": "/menu/khajoor-shake.jpg.png",
   "Grapes Juice": "/menu/grapes-juice.jpg",
   "Falsa Juice": "/menu/falsa-juice.jpg",
+  "Aaro Juice": "/menu/mango-juice.jpg",
   // Desi Food & Chai Paratha
   "Chicken Biryani": "/menu/chicken-biryani.jpg.png",
   "Chicken Karahi": "/menu/chicken-karahi.jpg.png",
@@ -1411,7 +1412,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-malai-boti-samosa",
@@ -1423,7 +1424,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-aalo-samosa",
@@ -1435,7 +1436,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-chicken-samosa",
@@ -1447,7 +1448,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-vegetable-roll",
@@ -1459,7 +1460,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-ziger-samosa",
@@ -1471,7 +1472,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-pizza-samosa",
@@ -1483,7 +1484,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-shawarma-roll",
@@ -1495,7 +1496,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-macaroni-samosa",
@@ -1507,7 +1508,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-cheez-samosa",
@@ -1519,7 +1520,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-snacks-seekh-kabab-roll",
@@ -1531,7 +1532,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
 
   // GSSC Canteen — Meals
@@ -1545,7 +1546,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
   {
     id: "gssc-meals-chicken-qeema",
@@ -1557,15 +1558,15 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    image: "/menu/gssc-menu.png",
   },
 
 
   // Annexe Canteen
   {
     id: "annexe-shake-panga",
-    name: "Panga Shake",
-    description: "The iconic Panga Shake — rich, indulgent, and unforgettable.",
+    name: "Panga",
+    description: "The iconic Panga — rich, indulgent, and unforgettable. Choose your flavour.",
     price: 250,
     category: "shakes-and-juices",
     rating: 5,
@@ -1573,6 +1574,38 @@ export const menuItems: MenuItem[] = [
     canteenSlug: "annexe",
     gradient: "from-[#DC2626]/30 to-[#F59E0B]/25",
     image: "/menu/mango-shake.jpg",
+    sizes: {
+      "Mango": 250,
+      "Banana": 250,
+      "Khajoor": 250,
+      "Strawberry": 250,
+      "Coffee": 250,
+      "Chocolate": 250,
+    },
+  },
+  {
+    id: "annexe-juice-falsa",
+    name: "Falsa Juice",
+    description: "Cold and tangy falsa juice made fresh.",
+    price: 150,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "annexe",
+    gradient: "from-[#DC2626]/30 to-[#FCA5A5]/25",
+    image: "/menu/falsa-juice.jpg",
+  },
+  {
+    id: "annexe-juice-aaro",
+    name: "Aaro Juice",
+    description: "Sweet and refreshing Aaro juice, freshly prepared.",
+    price: 150,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "annexe",
+    gradient: "from-[#DC2626]/30 to-[#FCA5A5]/25",
+    image: "/menu/mango-juice.jpg",
   },
 ];
 export function getMenuByCanteen(slug: string): MenuItem[] {

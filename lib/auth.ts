@@ -5,7 +5,7 @@ export interface StaffProfile {
   email: string;
   name: string;
   role: Role;
-  canteen_id?: number | null;
+  canteen_id?: string | null;
   active: boolean;
 }
 

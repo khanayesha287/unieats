@@ -1,7 +1,8 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase, buildStatusUpdatePayload } from "@/lib/supabase";
+import { buildStatusUpdatePayload, supabase } from "@/lib/supabase";
+import { supabaseAuth } from "@/lib/supabase-auth";
 
 type DriverStatus = "ready" | "out_for_delivery" | "delivered";
 
@@ -23,8 +24,8 @@ interface DriverOrder {
   id: number | string;
   order_number: string;
   student_name: string;
-  registration_number: string;
   phone: string;
+  department?: string | null;
   order_type: "pickup" | "delivery";
   delivery_location: string | null;
   canteen_id: number | string | null;
@@ -38,15 +39,25 @@ interface DriverOrder {
 const DRIVER_STATUSES: DriverStatus[] = ["ready", "out_for_delivery", "delivered"];
 
 const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  confirmed: "bg-blue-100 text-blue-800",
+  preparing: "bg-orange-100 text-orange-800",
   ready: "bg-emerald-100 text-emerald-800",
   out_for_delivery: "bg-cyan-100 text-cyan-800",
   delivered: "bg-green-100 text-green-800",
+  completed: "bg-slate-100 text-slate-800",
+  cancelled: "bg-red-100 text-red-800",
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  preparing: "Preparing",
   ready: "Ready for Pickup",
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 function pickString(
@@ -97,10 +108,8 @@ function toShortTime(value?: string | null): string {
 }
 
 function normalizeDriverStatus(value: unknown): string {
-  const normalized = typeof value === "string" ? value : "ready";
-  return DRIVER_STATUSES.includes(normalized as DriverStatus)
-    ? normalized
-    : "ready";
+  if (typeof value === "string" && value.trim()) return value;
+  return "pending";
 }
 
 function coerceCanteen(input: unknown): CanteenRecord | null {
@@ -142,9 +151,8 @@ function coerceOrder(input: unknown): DriverOrder | null {
       pickString(record, ["order_number", "orderNumber"]) ?? "\u2014",
     student_name:
       pickString(record, ["student_name", "studentName", "name"]) ?? "Unknown",
-    registration_number:
-      pickString(record, ["registration_number", "registrationNumber"]) ?? "\u2014",
     phone: pickString(record, ["phone", "mobile"]) ?? "\u2014",
+    department: pickString(record, ["department"]) ?? null,
     order_type: "delivery",
     delivery_location:
       pickString(record, ["delivery_location", "deliveryLocation"]) ?? null,
@@ -200,7 +208,7 @@ export default function DriverPortalContent() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
     if (!supabase) {
       setError("Supabase is not configured.");
       setIsLoading(false);
@@ -229,7 +237,11 @@ export default function DriverPortalContent() {
     const newOrders = (Array.isArray(ordersResult.data) ? ordersResult.data : [])
       .map(coerceOrder)
       .filter((r): r is DriverOrder => r !== null)
-      .filter((o) => DRIVER_STATUSES.includes(o.status as DriverStatus))
+      .filter((o) => {
+        // Only show orders that have reached "ready" stage or later
+        const preDriverStatuses = ["pending", "confirmed", "preparing", "cancelled"];
+        return !preDriverStatuses.includes(o.status);
+      })
       .sort((a, b) => {
         const at = a.created_at ? new Date(a.created_at).getTime() : 0;
         const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -248,37 +260,50 @@ export default function DriverPortalContent() {
     setOrders(newOrders);
     setItems(newItems);
     setError(hasRealError ? "Some queries failed. Check console." : null);
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
   }, []);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  // Polling every 15 s — silent refresh (no loading flash)
   useEffect(() => {
-    if (!supabase) return;
+    const interval = setInterval(() => {
+      void loadData(true);
+    }, 15_000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
-    const channel = supabase
+  useEffect(() => {
+    if (!supabaseAuth) return;
+
+    const channel = supabaseAuth
       .channel("driver-orders-realtime")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
-        () => { void loadData(); },
+        () => { void loadData(true); },
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
-        () => { void loadData(); },
+        () => { void loadData(true); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "orders" },
+        () => { void loadData(true); },
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "order_items" },
-        () => { void loadData(); },
+        () => { void loadData(true); },
       )
       .subscribe();
 
     return () => {
-      if (supabase) void supabase.removeChannel(channel);
+      if (supabaseAuth) void supabaseAuth.removeChannel(channel);
     };
   }, [loadData]);
 
@@ -356,62 +381,6 @@ export default function DriverPortalContent() {
     setError(null);
   };
 
-  const insertTestDelivery = async () => {
-    if (!supabase) return;
-    const canteen = canteens[0];
-    if (!canteen) {
-      setError("No canteen found to create a test delivery.");
-      return;
-    }
-
-    const orderNumber = String(Math.floor(1000 + Math.random() * 9000));
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("orders")
-      .insert([{
-        order_number: orderNumber,
-        student_name: "Test Delivery Student",
-        registration_number: "DRV-TEST-001",
-        phone: "03001234567",
-        delivery_location: "CS Department, Block A",
-        order_type: "delivery",
-        canteen_id: canteen.id,
-        status: "ready",
-        total_amount: 450,
-        delivery_charge: 55,
-        driver_id: null,
-      }])
-      .select("id")
-      .single();
-
-    if (insertError) {
-      console.error("[UniEats Driver] Test delivery insert failed:", insertError.message);
-      setError("Test delivery insert failed.");
-      return;
-    }
-
-    const orderId = inserted?.id;
-    if (orderId) {
-      await supabase.from("order_items").insert([{
-        order_id: orderId,
-        menu_item_id: null,
-        item_name: "Test Delivery Burger",
-        quantity: 2,
-        price: 175,
-        subtotal: 350,
-      }, {
-        order_id: orderId,
-        menu_item_id: null,
-        item_name: "Test Delivery Fries",
-        quantity: 1,
-        price: 100,
-        subtotal: 100,
-      }]);
-    }
-
-    await loadData();
-  };
-
   return (
     <div className="min-h-screen bg-[#f8f5ff] pb-24 text-slate-900">
       {/* Sticky header */}
@@ -425,15 +394,6 @@ export default function DriverPortalContent() {
               Deliveries
             </h1>
             <div className="flex items-center gap-2">
-              {process.env.NODE_ENV !== "production" && (
-                <button
-                  type="button"
-                  onClick={() => void insertTestDelivery()}
-                  className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-200"
-                >
-                  + Test Delivery
-                </button>
-              )}
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white">
                 {activeOrders.length}
               </span>
@@ -536,9 +496,11 @@ export default function DriverPortalContent() {
                               <p className="mt-1 text-sm font-medium text-slate-800">
                                 {order.student_name}
                               </p>
-                              <p className="text-xs text-slate-500">
-                                {order.registration_number}
-                              </p>
+                              {order.department && (
+                                <p className="text-xs text-slate-500">
+                                  {order.department}
+                                </p>
+                              )}
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-bold text-slate-900">
@@ -589,9 +551,11 @@ export default function DriverPortalContent() {
                                   >
                                     {order.phone}
                                   </a>
-                                  <p className="text-xs text-slate-500">
-                                    {order.registration_number}
-                                  </p>
+                                  {order.department && (
+                                    <p className="text-xs text-slate-500">
+                                      {order.department}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
 

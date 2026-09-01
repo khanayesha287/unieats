@@ -19,14 +19,15 @@ interface MinimalOrder {
   id: number | string;
   order_number: string;
   student_name: string;
-  registration_number: string;
-  phone?: string | null;
   order_type: string;
   delivery_location?: string | null;
   canteen_id?: number | string | null;
   status: string;
-  total_amount?: number | null;
   created_at?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  registration_number?: string | null;
+  total_amount?: number | null;
 }
 
 interface MinimalCanteen {

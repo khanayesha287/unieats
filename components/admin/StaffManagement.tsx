@@ -158,7 +158,7 @@ export default function StaffManagement() {
     await handleUpdate(staffMember, { active: !staffMember.active });
   };
 
-  const canteenName = (canteenId: number | null | undefined): string => {
+  const canteenName = (canteenId: string | number | null | undefined): string => {
     if (!canteenId) return "\u2014";
     return canteens.find((c) => String(c.id) === String(canteenId))?.name ?? "Unknown";
   };

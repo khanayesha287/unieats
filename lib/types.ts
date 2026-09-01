@@ -44,12 +44,31 @@ export interface CartItem {
   canteenName: string;
   gradient: string;
   size?: string;
+  /** Resolved database canteen ID (optional — resolved at checkout if absent). */
+  canteenId?: string | number | null;
 }
 
 export type OrderType = "pickup" | "delivery";
 
+/**
+ * Canonical order-status type shared across all portals.
+ * Status flow: pending → confirmed → preparing → ready → out_for_delivery → delivered → completed
+ * Any status can transition to cancelled.
+ */
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "out_for_delivery"
+  | "delivered"
+  | "completed"
+  | "cancelled";
+
 export interface CheckoutFormData {
   studentName: string;
+  /** University registration number (guest checkout — optional identifier). */
+  registrationNumber: string;
   phone: string;
   department: string;
   orderType: OrderType;
@@ -68,6 +87,8 @@ export interface CanteenOrderGroup {
 export interface Order {
   orderNumber: string;
   studentName: string;
+  /** University registration number, if provided at checkout. */
+  registrationNumber?: string;
   phone: string;
   department: string;
   orderType: OrderType;

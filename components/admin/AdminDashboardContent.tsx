@@ -2,19 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, buildStatusUpdatePayload, deleteOrderFromSupabase } from "@/lib/supabase";
+import { supabaseAuth } from "@/lib/supabase-auth";
+import type { OrderStatus } from "@/lib/types";
+import { Trash2, MoreVertical, X } from "lucide-react";
 import AIOperationsPanel from "./AIOperationsPanel";
 import StaffManagement from "./StaffManagement";
-
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "preparing"
-  | "ready"
-  | "out_for_delivery"
-  | "delivered"
-  | "completed"
-  | "cancelled";
 
 interface AdminCanteen {
   id: number | string;
@@ -40,8 +33,9 @@ interface AdminOrder {
   id: number | string;
   order_number: string;
   student_name: string;
-  registration_number: string;
   phone: string;
+  department?: string | null;
+  registration_number?: string | null;
   order_type: "pickup" | "delivery";
   delivery_location?: string | null;
   canteen_id?: number | string | null;
@@ -49,6 +43,9 @@ interface AdminOrder {
   status: OrderStatus;
   total_amount: number;
   delivery_charge: number;
+  discount?: number | null;
+  payment_method?: string | null;
+  special_instructions?: string | null;
   created_at?: string | null;
 }
 
@@ -244,16 +241,20 @@ export default function AdminDashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "orders" | "ai" | "staff" | "portals">("overview");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [deleteTarget, setDeleteTarget] = useState<AdminOrder | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteMenuOpen, setDeleteMenuOpen] = useState<string | number | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     const data = await fetchDashboardData();
     setCanteens(data.canteens);
     setDrivers(data.drivers);
     setOrders(data.orders);
     setOrderItems(data.orderItems);
     setError(data.error);
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
     if (!selectedOrderId && data.orders.length > 0) {
       setSelectedOrderId(data.orders[0].id);
     }
@@ -263,8 +264,16 @@ export default function AdminDashboardContent() {
     void loadData();
   }, []);
 
+  // Polling fallback every 15 s — silent refresh (no loading flash)
   useEffect(() => {
-    const client = supabase;
+    const interval = setInterval(() => {
+      void loadData(true);
+    }, 15_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const client = supabaseAuth;
     if (!client) return;
 
     const channel = client
@@ -273,21 +282,28 @@ export default function AdminDashboardContent() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
         () => {
-          void loadData();
+          void loadData(true);
         },
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
         () => {
-          void loadData();
+          void loadData(true);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "orders" },
+        () => {
+          void loadData(true);
         },
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "order_items" },
         () => {
-          void loadData();
+          void loadData(true);
         },
       )
       .subscribe();
@@ -323,21 +339,54 @@ export default function AdminDashboardContent() {
     () => ({
       total: orders.length,
       pending: orders.filter((order) => order.status === "pending").length,
+      confirmed: orders.filter((order) => order.status === "confirmed").length,
       preparing: orders.filter((order) => order.status === "preparing").length,
       ready: orders.filter((order) => order.status === "ready").length,
       outForDelivery: orders.filter((order) => order.status === "out_for_delivery").length,
+      delivered: orders.filter((order) => order.status === "delivered").length,
       completed: orders.filter((order) => order.status === "completed").length,
+      cancelled: orders.filter((order) => order.status === "cancelled").length,
     }),
     [orders],
   );
+
+  const filteredOrders = useMemo(() => {
+    if (statusFilter === "all") return orders;
+    return orders.filter((order) => order.status === statusFilter);
+  }, [orders, statusFilter]);
+
+  const handleDeleteOrder = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteOrderFromSupabase(deleteTarget.id);
+      setOrders((current) => current.filter((o) => String(o.id) !== String(deleteTarget.id)));
+      if (String(selectedOrderId) === String(deleteTarget.id)) {
+        setSelectedOrderId(null);
+      }
+      setError(null);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[UniEats Admin] Delete order failed:", errMsg);
+      setError("Failed to delete order. Check the browser console for details.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
 
   const updateOrderStatus = async (orderId: number | string, nextStatus: OrderStatus) => {
     if (!supabase) return;
 
     setIsUpdating(true);
+
+    // Build payload with status timestamp (same as canteen/driver portals)
+    const order = orders.find((o) => String(o.id) === String(orderId));
+    const payload = buildStatusUpdatePayload(nextStatus, order as unknown as Record<string, unknown>);
+
     const { error: updateError } = await supabase
       .from("orders")
-      .update({ status: nextStatus })
+      .update(payload)
       .eq("id", orderId);
 
     setIsUpdating(false);
@@ -349,8 +398,8 @@ export default function AdminDashboardContent() {
     }
 
     setOrders((current) =>
-      current.map((order) =>
-        String(order.id) === String(orderId) ? { ...order, status: nextStatus } : order,
+      current.map((o) =>
+        String(o.id) === String(orderId) ? { ...o, status: nextStatus } : o,
       ),
     );
   };
@@ -377,81 +426,6 @@ export default function AdminDashboardContent() {
           : order,
       ),
     );
-  };
-
-  const insertTestOrder = async () => {
-    if (!supabase) {
-      setError("Supabase is not configured, so a test order cannot be inserted.");
-      return;
-    }
-
-    if (process.env.NODE_ENV === "production") {
-      setError("Test-order insertion is disabled in production.");
-      return;
-    }
-
-    const fallbackCanteen = canteens[0];
-    if (!fallbackCanteen) {
-      setError("No canteen record was found in Supabase to associate with a test order.");
-      return;
-    }
-
-    const fallbackDriver = drivers[0];
-    const orderNumber = String(Math.floor(1000 + Math.random() * 9000));
-    const totalAmount = 560;
-    const deliveryCharge = 0;
-
-    const { data: insertedOrder, error: orderInsertError } = await supabase
-      .from("orders")
-      .insert([
-        {
-          order_number: orderNumber,
-          student_name: "Development Test",
-          registration_number: "DEV-TEST-001",
-          phone: "03123456789",
-          delivery_location: null,
-          order_type: "pickup",
-          canteen_id: fallbackCanteen.id,
-          status: "pending",
-          total_amount: totalAmount,
-          delivery_charge: deliveryCharge,
-          driver_id: fallbackDriver?.id ?? null,
-        },
-      ])
-      .select("id")
-      .single();
-
-    if (orderInsertError) {
-      console.error("[UniEats Admin] Test order insert failed:", orderInsertError.message);
-      setError("Test order insertion failed. Check the browser console for details.");
-      return;
-    }
-
-    const orderId = insertedOrder?.id;
-    if (!orderId) {
-      setError("The test order was inserted but no order id was returned.");
-      return;
-    }
-
-    const { error: itemsError } = await supabase.from("order_items").insert([
-      {
-        order_id: orderId,
-        menu_item_id: null,
-        item_name: "Development Test Item",
-        quantity: 2,
-        price: 280,
-        subtotal: 560,
-      },
-    ]);
-
-    if (itemsError) {
-      console.error("[UniEats Admin] Test order items insert failed:", itemsError.message);
-      setError("The test order was created but its items did not insert correctly.");
-      return;
-    }
-
-    await loadData();
-    setSelectedOrderId(orderId);
   };
 
   const renderSummaryCard = (label: string, value: number, accent: string) => (
@@ -481,16 +455,6 @@ export default function AdminDashboardContent() {
               Operations Dashboard
             </h1>
           </div>
-
-          {process.env.NODE_ENV !== "production" && (
-            <button
-              type="button"
-              onClick={() => void insertTestOrder()}
-              className="inline-flex items-center justify-center rounded-full bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
-            >
-              Insert Test Order
-            </button>
-          )}
         </div>
 
         {error && (
@@ -526,13 +490,12 @@ export default function AdminDashboardContent() {
         {/* Overview tab */}
         {activeTab === "overview" && (
           <>
-            <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-              {renderSummaryCard("Total orders", counts.total, "bg-violet-100 text-violet-700")}
+            <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               {renderSummaryCard("Pending", counts.pending, "bg-amber-100 text-amber-700")}
               {renderSummaryCard("Preparing", counts.preparing, "bg-violet-100 text-violet-700")}
               {renderSummaryCard("Ready", counts.ready, "bg-emerald-100 text-emerald-700")}
               {renderSummaryCard("Out for delivery", counts.outForDelivery, "bg-cyan-100 text-cyan-700")}
-              {renderSummaryCard("Completed", counts.completed, "bg-green-100 text-green-700")}
+              {renderSummaryCard("Delivered", counts.delivered, "bg-blue-100 text-blue-700")}
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <Link
@@ -567,25 +530,56 @@ export default function AdminDashboardContent() {
         {/* Orders tab */}
         {activeTab === "orders" && (
         <>
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          {renderSummaryCard("Total orders", counts.total, "bg-violet-100 text-violet-700")}
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {renderSummaryCard("Pending", counts.pending, "bg-amber-100 text-amber-700")}
           {renderSummaryCard("Preparing", counts.preparing, "bg-violet-100 text-violet-700")}
           {renderSummaryCard("Ready", counts.ready, "bg-emerald-100 text-emerald-700")}
           {renderSummaryCard("Out for delivery", counts.outForDelivery, "bg-cyan-100 text-cyan-700")}
-          {renderSummaryCard("Completed", counts.completed, "bg-green-100 text-green-700")}
+          {renderSummaryCard("Delivered", counts.delivered, "bg-blue-100 text-blue-700")}
         </div>
 
+        {/* Status filter tabs */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {([
+            { value: "all" as const, label: "All" },
+            { value: "pending" as const, label: "Pending" },
+            { value: "confirmed" as const, label: "Confirmed" },
+            { value: "preparing" as const, label: "Preparing" },
+            { value: "ready" as const, label: "Ready" },
+            { value: "out_for_delivery" as const, label: "Out for Delivery" },
+            { value: "delivered" as const, label: "Delivered" },
+            { value: "cancelled" as const, label: "Cancelled" },
+          ]).map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              onClick={() => setStatusFilter(filter.value)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                statusFilter === filter.value
+                  ? "bg-violet-600 text-white shadow-md"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {filter.label}
+              {filter.value === "all"
+                ? ` (${orders.length})`
+                : ` (${orders.filter((o) => o.status === filter.value).length})`}
+            </button>
+          ))}
+        </div>
+        
         <div className="grid gap-6 xl:grid-cols-[1.7fr_0.9fr]">
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
               <h2 className="text-lg font-bold text-slate-900">Recent Orders</h2>
             </div>
-
+        
             {isLoading ? (
               <div className="p-6 text-sm text-slate-600">Loading orders…</div>
-            ) : orders.length === 0 ? (
-              <div className="p-6 text-sm text-slate-600">No orders found in Supabase.</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="p-6 text-center text-sm text-slate-500">
+                {statusFilter === "all" ? "No orders yet." : `No ${statusFilter.replace(/_/g, " ")} orders.`}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
@@ -596,12 +590,16 @@ export default function AdminDashboardContent() {
                       <th className="px-4 py-3 font-semibold">Canteen</th>
                       <th className="px-4 py-3 font-semibold">Total</th>
                       <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Payment</th>
                       <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Time</th>
+                      <th className="px-4 py-3 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {orders.map((order) => {
+                    {filteredOrders.map((order) => {
                       const canteen = canteenMap[String(order.canteen_id ?? "")];
+                      const isOpen = deleteMenuOpen === order.id;
                       return (
                         <tr
                           key={String(order.id)}
@@ -615,7 +613,7 @@ export default function AdminDashboardContent() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-slate-900">{order.student_name}</div>
-                            <div className="text-xs text-slate-500">{order.registration_number}</div>
+                            <div className="text-xs text-slate-500">{order.registration_number || order.department || "\u2014"}</div>
                           </td>
                           <td className="px-4 py-3 text-slate-600">
                             {canteen?.name ?? "Unknown canteen"}
@@ -626,10 +624,57 @@ export default function AdminDashboardContent() {
                           <td className="px-4 py-3 capitalize text-slate-600">
                             {order.order_type === "delivery" ? "Delivery" : "Pickup"}
                           </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {order.payment_method === "cod"
+                              ? "COD"
+                              : order.payment_method === "online"
+                                ? "Online"
+                                : "\u2014"}
+                          </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}>
                               {order.status.replace(/_/g, " ")}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            {order.created_at ? formatDate(order.created_at) : "\u2014"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteMenuOpen(isOpen ? null : order.id);
+                                }}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                aria-label="Order actions"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                              {isOpen && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={(e) => { e.stopPropagation(); setDeleteMenuOpen(null); }}
+                                  />
+                                  <div className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteMenuOpen(null);
+                                        setDeleteTarget(order);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Delete Order
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -660,12 +705,26 @@ export default function AdminDashboardContent() {
                     <p className="font-semibold text-slate-900">{selectedOrder.student_name}</p>
                   </div>
                   <div>
-                    <p className="text-slate-500">Registration</p>
-                    <p className="font-semibold text-slate-900">{selectedOrder.registration_number}</p>
-                  </div>
-                  <div>
                     <p className="text-slate-500">Phone</p>
                     <p className="font-semibold text-slate-900">{selectedOrder.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Department</p>
+                    <p className="font-semibold text-slate-900">{selectedOrder.department ?? "\u2014"}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Registration No.</p>
+                    <p className="font-semibold text-slate-900">{selectedOrder.registration_number ?? "\u2014"}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Payment Method</p>
+                    <p className="font-semibold text-slate-900">
+                      {selectedOrder.payment_method === "cod"
+                        ? "Cash on Delivery"
+                        : selectedOrder.payment_method === "online"
+                          ? "Online Payment"
+                          : selectedOrder.payment_method ?? "\u2014"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-slate-500">Canteen</p>
@@ -735,6 +794,12 @@ export default function AdminDashboardContent() {
                       <span>Delivery charge</span>
                       <span>{formatCurrency(Number(selectedOrder.delivery_charge ?? 0))}</span>
                     </div>
+                    {selectedOrder.discount !== null && selectedOrder.discount !== undefined && Number(selectedOrder.discount) > 0 && (
+                      <div className="mb-2 flex items-center justify-between text-sm text-emerald-600">
+                        <span>Discount</span>
+                        <span>-{formatCurrency(Number(selectedOrder.discount))}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-base font-bold text-slate-900">
                       <span>Total</span>
                       <span>{formatCurrency(Number(selectedOrder.total_amount ?? 0))}</span>
@@ -808,6 +873,50 @@ export default function AdminDashboardContent() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Delete this order?</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Order <span className="font-semibold">#{deleteTarget.order_number}</span> from {deleteTarget.student_name}.
+                  This action cannot be undone.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteOrder()}
+                disabled={isDeleting}
+                className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

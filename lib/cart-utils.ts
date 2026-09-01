@@ -24,7 +24,7 @@ export function calculateDeliveryFee(
   orderType: OrderType,
 ): number {
   if (orderType !== "delivery" || items.length === 0) return 0;
-  return 25;
+  return DELIVERY_FEE_PER_CANTEEN * getUniqueCanteenCount(items);
 }
 
 export function groupItemsByCanteen(items: CartItem[]): CanteenOrderGroup[] {
@@ -60,6 +60,7 @@ export function buildOrder(
   return {
     orderNumber,
     studentName: form.studentName,
+    registrationNumber: form.registrationNumber.trim() || undefined,
     phone: form.phone,
     department: form.department,
     orderType: form.orderType,
@@ -76,7 +77,8 @@ export function buildOrder(
 }
 
 export function generateOrderNumber(): string {
-  return String(Math.floor(Math.random() * 900) + 100);
+  const digits = String(Math.floor(Math.random() * 900) + 100);
+  return `UE-${digits}`;
 }
 
 export function formatOrderTime(isoTimestamp: string): string {

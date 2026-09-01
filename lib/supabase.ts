@@ -1,5 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import type { Order } from "@/lib/types";
+import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey =
@@ -30,9 +31,9 @@ interface PostgrestErrorShape {
  * hint) so the exact failure cause is visible during development.
  * Never logs credentials, keys, or auth tokens — only the error object.
  */
-function logOrderError(context: string, error: PostgrestErrorShape | null): void {
+function logOrderError(label: string, error: PostgrestErrorShape | null): void {
   if (!error) return;
-  console.error(`[UniEats] ORDER ERROR — ${context}:`, {
+  console.error(`[UniEats] ${label}:`, {
     message: error?.message,
     code: error?.code,
     details: error?.details,
@@ -107,7 +108,7 @@ async function resolveCanteenId(
   const { data, error } = await supabase.from("canteens").select("id, name");
 
   if (error) {
-    logOrderError("canteen lookup for order save", error);
+    logOrderError("Canteen lookup for order save failed", error);
     return null;
   }
 
@@ -163,122 +164,220 @@ async function resolveDriverId(): Promise<string | number | null> {
   return data?.id ?? null;
 }
 
+export interface SaveOrderOptions {
+  /**
+   * Initial status for the order. Defaults to "pending".
+   */
+  status?: string;
+}
+
+/**
+ * Saves a multi-canteen order to Supabase.
+ *
+ * Creates one `orders` row per canteen group, each with its own canteen_id,
+ * subtotal, delivery charge, and associated `order_items` rows.
+ *
+ * If any group fails after earlier groups succeeded, the already-created
+ * orders are rolled back (deleted) to avoid a partial state.
+ */
 export async function saveOrderToSupabase(
   order: Order,
-): Promise<{ orderId: string | number }> {
+  options: SaveOrderOptions = {},
+): Promise<{ orderId: string | number; orderIds: (string | number)[] }> {
   if (!supabase) {
     throw new Error("Supabase is not configured. Cannot save order.");
   }
 
-  const canteenId =
-    order.canteenOrders.length > 0
-      ? await resolveCanteenId(
-          order.canteenOrders[0].canteenSlug,
-          order.canteenOrders[0].canteenName,
-        )
-      : null;
+  const initialStatus = options.status ?? "pending";
+  const createdOrderIds: (string | number)[] = [];
 
+  // Resolve driver once for delivery orders
   const driverId =
     order.orderType === "delivery" ? await resolveDriverId() : null;
 
-  // Build order record — include department if the column exists
-  const orderRecord: Record<string, unknown> = {
-    order_number: order.orderNumber,
-    student_name: order.studentName,
-    phone: order.phone,
-    department: order.department ?? null,
-    delivery_location:
-      order.orderType === "delivery" ? order.deliveryLocation ?? null : null,
-    order_type: order.orderType,
-    canteen_id: canteenId,
-    status: "pending",
-    total_amount: Number(order.grandTotal),
-    delivery_charge: Number(order.deliveryFee),
-    discount: Number(order.deliveryFee > 0 ? 25 : 0),
-    driver_id: driverId,
-    payment_method: order.paymentMethod ?? null,
-    special_instructions: order.specialInstructions ?? null,
-  };
+  // Delivery charge per canteen order (Rs. 25 per canteen for delivery, 0 for pickup)
+  const perCanteenDelivery =
+    order.orderType === "delivery" ? DELIVERY_FEE_PER_CANTEEN : 0;
 
-  let insertedOrder: { id: string | number } | null = null;
-  let orderError: PostgrestErrorShape | null = null;
+  try {
+    for (const group of order.canteenOrders) {
+      // Resolve canteen_id for THIS group
+      const canteenId = await resolveCanteenId(
+        group.canteenSlug,
+        group.canteenName,
+      );
 
-  // Insert with all columns. If the orders table is missing an optional
-  // column (e.g. payment_method before its migration has been run), drop
-  // that column and retry so the order still saves instead of failing.
-  const attemptRecord: Record<string, unknown> = { ...orderRecord };
-  const droppedColumns: string[] = [];
+      // Build order record for this canteen group
+      const orderRecord: Record<string, unknown> = {
+        order_number: order.orderNumber,
+        student_name: order.studentName,
+        registration_number: order.registrationNumber?.trim() || null,
+        phone: order.phone,
+        department: order.department ?? null,
+        delivery_location:
+          order.orderType === "delivery"
+            ? order.deliveryLocation ?? null
+            : null,
+        order_type: order.orderType,
+        canteen_id: canteenId,
+        status: initialStatus,
+        total_amount: Number(group.subtotal + perCanteenDelivery),
+        delivery_charge: Number(perCanteenDelivery),
+        discount: Number(perCanteenDelivery > 0 ? 25 : 0),
+        driver_id: driverId,
+        payment_method: order.paymentMethod ?? null,
+        special_instructions: order.specialInstructions ?? null,
+      };
 
-  for (;;) {
-    const result = await supabase
-      .from("orders")
-      .insert([attemptRecord])
-      .select("id")
-      .single();
+      // Insert with column-dropping fallback for missing optional columns
+      let insertedOrder: { id: string | number } | null = null;
+      let orderError: PostgrestErrorShape | null = null;
+      const attemptRecord: Record<string, unknown> = { ...orderRecord };
+      const droppedColumns: string[] = [];
 
-    if (!result.error) {
-      insertedOrder = result.data as { id: string | number } | null;
-      orderError = null;
-      break;
+      for (;;) {
+        const result = await supabase
+          .from("orders")
+          .insert([attemptRecord])
+          .select("id")
+          .single();
+
+        if (!result.error) {
+          insertedOrder = result.data as { id: string | number } | null;
+          orderError = null;
+          break;
+        }
+
+        const missingColumn = findMissingColumn(result.error);
+        if (!missingColumn || !(missingColumn in attemptRecord)) {
+          orderError = result.error;
+          logOrderError("Order insert failed", result.error);
+          console.error(
+            "[UniEats] Order payload that failed to save:",
+            attemptRecord,
+          );
+          break;
+        }
+
+        droppedColumns.push(missingColumn);
+        delete attemptRecord[missingColumn];
+      }
+
+      if (droppedColumns.length > 0) {
+        console.warn(
+          `[UniEats] The orders table is missing column(s): ${droppedColumns.join(", ")}. ` +
+            "The order was saved without them. Run supabase-migrations/ " +
+            "add-payment-method.sql in the Supabase SQL editor to persist them.",
+        );
+      }
+
+      if (orderError) {
+        throw new Error(
+          `Failed to create order for ${group.canteenName}: ${orderError.message ?? "Unknown error"}`,
+        );
+      }
+
+      const orderId = insertedOrder?.id;
+      if (orderId === undefined || orderId === null) {
+        throw new Error("Order insert succeeded but no order id was returned.");
+      }
+
+      createdOrderIds.push(orderId);
+
+      // Insert order_items for THIS canteen group only
+      const itemsToInsert = group.items.map((item) => ({
+        order_id: orderId,
+        menu_item_id: normalizeMenuItemId(item.id),
+        item_name: item.name,
+        quantity: item.quantity,
+        price: Number(item.price),
+        subtotal: Number(item.price * item.quantity),
+      }));
+
+      if (itemsToInsert.length > 0) {
+        const { error: itemsError } = await supabase
+          .from("order_items")
+          .insert(itemsToInsert);
+
+        if (itemsError) {
+          logOrderError("Order items insert failed", itemsError);
+          console.error(
+            "[UniEats] Order items payload that failed to save:",
+            itemsToInsert,
+          );
+          throw new Error(
+            `Order for ${group.canteenName} was created but items failed to save: ${itemsError.message ?? "Unknown error"}`,
+          );
+        }
+      }
     }
-
-    const missingColumn = findMissingColumn(result.error);
-    if (!missingColumn || !(missingColumn in attemptRecord)) {
-      orderError = result.error;
-      logOrderError("orders insert", result.error);
-      console.error("[UniEats] Order payload that failed to save:", attemptRecord);
-      break;
+  } catch (error) {
+    // Rollback: delete any orders that were already created
+    if (createdOrderIds.length > 0) {
+      console.warn(
+        `[UniEats] Rolling back ${createdOrderIds.length} order(s) due to failure in multi-canteen checkout.`,
+      );
+      for (const rollbackId of createdOrderIds) {
+        try {
+          await supabase
+            .from("order_items")
+            .delete()
+            .eq("order_id", rollbackId);
+          await supabase.from("orders").delete().eq("id", rollbackId);
+        } catch (rollbackError) {
+          console.error(
+            `[UniEats] Failed to roll back order ${rollbackId}:`,
+            rollbackError,
+          );
+        }
+      }
     }
-
-    droppedColumns.push(missingColumn);
-    delete attemptRecord[missingColumn];
+    throw error;
   }
 
-  if (droppedColumns.length > 0) {
-    console.warn(
-      `[UniEats] The orders table is missing column(s): ${droppedColumns.join(", ")}. ` +
-        "The order was saved without them. Run supabase-migrations/" +
-        "add-payment-method-column.sql in the Supabase SQL editor to persist them.",
+  return { orderId: createdOrderIds[0], orderIds: createdOrderIds };
+}
+
+// ---------------------------------------------------------------------------
+// Delete order (admin-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Deletes an order and its associated order_items from Supabase.
+ * Should only be called for admin-authorized delete operations.
+ */
+export async function deleteOrderFromSupabase(
+  orderId: string | number,
+): Promise<void> {
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Cannot delete order.");
+  }
+
+  // Delete order_items first (child rows)
+  const { error: itemsError } = await supabase
+    .from("order_items")
+    .delete()
+    .eq("order_id", orderId);
+
+  if (itemsError) {
+    console.error("[UniEats] Failed to delete order items:", itemsError);
+    throw new Error(
+      `Failed to delete order items: ${itemsError.message ?? "Unknown error"}`,
     );
   }
+
+  // Delete the order itself
+  const { error: orderError } = await supabase
+    .from("orders")
+    .delete()
+    .eq("id", orderId);
 
   if (orderError) {
+    console.error("[UniEats] Failed to delete order:", orderError);
     throw new Error(
-      `Failed to create order in database: ${orderError.message ?? "Unknown error"}`,
+      `Failed to delete order: ${orderError.message ?? "Unknown error"}`,
     );
   }
-
-  const orderId = insertedOrder?.id;
-  if (orderId === undefined || orderId === null) {
-    throw new Error("Order insert succeeded but no order id was returned.");
-  }
-
-  const itemsToInsert = order.canteenOrders.flatMap((group) =>
-    group.items.map((item) => ({
-      order_id: orderId,
-      menu_item_id: normalizeMenuItemId(item.id),
-      item_name: item.name,
-      quantity: item.quantity,
-      price: Number(item.price),
-      subtotal: Number(item.price * item.quantity),
-    })),
-  );
-
-  if (itemsToInsert.length > 0) {
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(itemsToInsert);
-
-    if (itemsError) {
-      logOrderError("order_items insert", itemsError);
-      console.error("[UniEats] Order items payload that failed to save:", itemsToInsert);
-      throw new Error(
-        `Order was created but items failed to save: ${itemsError.message ?? "Unknown error"}`,
-      );
-    }
-  }
-
-  return { orderId };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import type { Order } from "@/lib/types";
 import { WHATSAPP_URL } from "@/lib/constants";
+import { formatOrderTime } from "@/lib/cart-utils";
 
 function formatItems(items: Order["canteenOrders"][number]["items"]): string[] {
   return items.map((item) => `• ${item.name}${item.size ? ` (${item.size})` : ""} ×${item.quantity}`);
@@ -7,14 +8,21 @@ function formatItems(items: Order["canteenOrders"][number]["items"]): string[] {
 
 export function formatWhatsAppOrderMessage(order: Order): string {
   const orderTypeLabel = order.orderType === "pickup" ? "Pickup" : "Delivery";
-  const paymentLabel = order.paymentMethod === "cod" ? "Cash on Delivery (COD)" : "Online Payment";
+  const paymentLabel =
+    order.paymentMethod === "cod"
+      ? "COD (when food delivers)"
+      : "Online Payment";
   const lines: string[] = [];
 
-  lines.push("\u2022 New UniEats Order");
+  lines.push("\u2022 *New UniEats Order*");
   lines.push("");
-  lines.push("*Order No:* " + order.orderNumber);
+  lines.push("*Order #:* " + order.orderNumber);
+  lines.push("*Time:* " + formatOrderTime(order.timestamp));
   lines.push("");
-  lines.push("*Name:* " + order.studentName);
+  lines.push("*Student Name:* " + order.studentName);
+  if (order.registrationNumber) {
+    lines.push("*Registration #:* " + order.registrationNumber);
+  }
   lines.push("*Phone Number:* " + order.phone);
   lines.push("*Department:* " + order.department);
   lines.push("*Order Type:* " + orderTypeLabel);
@@ -33,13 +41,15 @@ export function formatWhatsAppOrderMessage(order: Order): string {
   });
 
   lines.push("");
-  lines.push("Total: Rs." + order.subtotal);
+  lines.push("*Subtotal:* Rs." + order.subtotal);
 
   if (order.deliveryFee > 0) {
-    lines.push("Delivery Charges: Rs." + order.deliveryFee);
+    lines.push("*Delivery Charges:* Rs." + order.deliveryFee + " (Discount: Rs.25)");
+  } else {
+    lines.push("*Delivery Charges:* Rs.0");
   }
 
-  lines.push("Grand Total: Rs." + order.grandTotal);
+  lines.push("*Total:* Rs." + order.grandTotal);
 
   return lines.join("\n");
 }

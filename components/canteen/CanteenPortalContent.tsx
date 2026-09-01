@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase, buildStatusUpdatePayload } from "@/lib/supabase";
+import { supabaseAuth } from "@/lib/supabase-auth";
 import { useAuth } from "@/components/providers/AuthProvider";
 
 export type CanteenStatus = "pending" | "confirmed" | "preparing" | "ready";
@@ -246,14 +247,14 @@ export default function CanteenPortalContent() {
     }
   }, [profile, canteens]);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     const data = await fetchPortalData();
     setCanteens(data.canteens);
     setOrders(data.orders);
     setItems(data.items);
     setError(data.error);
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
     if (!selectedCanteenId && data.canteens.length > 0) {
       setSelectedCanteenId(data.canteens[0].id);
     }
@@ -261,15 +262,24 @@ export default function CanteenPortalContent() {
 
   useEffect(() => { void loadData(); }, []);
 
+  // Polling every 15 s — silent refresh (no loading flash)
   useEffect(() => {
-    if (!supabase) return;
-    const channel = supabase
+    const interval = setInterval(() => {
+      void loadData(true);
+    }, 15_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseAuth) return;
+    const channel = supabaseAuth
       .channel("canteen-orders-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => { void loadData(); })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, () => { void loadData(); })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "order_items" }, () => { void loadData(); })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => { void loadData(true); })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, () => { void loadData(true); })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "orders" }, () => { void loadData(true); })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "order_items" }, () => { void loadData(true); })
       .subscribe();
-    return () => { if (supabase) void supabase.removeChannel(channel); };
+    return () => { if (supabaseAuth) void supabaseAuth.removeChannel(channel); };
   }, []);
 
   const canteenMap = useMemo(

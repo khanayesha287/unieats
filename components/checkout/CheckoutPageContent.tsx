@@ -22,6 +22,7 @@ import type { CheckoutFormData, OrderType } from "@/lib/types";
 
 const initialForm: CheckoutFormData = {
   studentName: "",
+  registrationNumber: "",
   phone: "",
   department: DEPARTMENTS[0],
   orderType: "pickup",
@@ -215,6 +216,15 @@ export default function CheckoutPageContent() {
                 setForm((current) => ({ ...current, phone: value }))
               }
               placeholder="03XXXXXXXXX"
+            />
+            <Field
+              id="registrationNumber"
+              label="Registration Number"
+              value={form.registrationNumber}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, registrationNumber: value }))
+              }
+              placeholder="e.g. 2023-BCS-045"
             />
             <div>
               <label

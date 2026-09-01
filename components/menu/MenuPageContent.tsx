@@ -143,7 +143,7 @@ export default function MenuPageContent({ canteenSlug, initialCategory = "all" }
         {category === "fast-food" && !fastFoodSub ? (
           // Fast Food subcategory picker — 2-col mobile grid
           <div className="mt-6">
-            <p className="mb-3 text-sm font-semibold text-white/70 uppercase tracking-wider">
+            <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
               Choose a subcategory
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

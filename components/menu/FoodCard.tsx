@@ -20,7 +20,14 @@ export default function FoodCard({ item }: FoodCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
+  // Determine if sizes are pizza-style (S/M/L) or flavour-style
   const hasSizes = item.sizes !== undefined;
+  const isPizzaSizes = hasSizes && item.sizes && Object.keys(item.sizes).some(
+    (k) => k === "Small" || k === "Medium" || k === "Large",
+  );
+  const allSamePrice = hasSizes && item.sizes
+    ? new Set(Object.values(item.sizes)).size === 1
+    : false;
   const [selectedSize, setSelectedSize] = useState<string>(() => {
     if (!item.sizes) return "";
     return "Small" in item.sizes ? "Small" : Object.keys(item.sizes)[0];
@@ -91,11 +98,15 @@ export default function FoodCard({ item }: FoodCardProps) {
           </p>
         )}
 
-        {/* Sizes — compact pill row */}
+        {/* Sizes / Flavours — compact pill row */}
         {hasSizes && item.sizes && (
           <div className="mt-1 flex flex-wrap gap-1">
             {Object.entries(item.sizes).map(([size, price]) => {
               const active = selectedSize === size;
+              const label = isPizzaSizes
+                ? (size === "Small" ? 'S (7")' : size === "Medium" ? 'M (10")' : size === "Large" ? 'L (13")' : size)
+                : size;
+              const priceLabel = allSamePrice ? "" : ` \u00B7 Rs.${price}`;
               return (
                 <button
                   key={size}
@@ -108,7 +119,7 @@ export default function FoodCard({ item }: FoodCardProps) {
                       : "border-gray-200 bg-white text-gray-600 hover:border-[#6C2BD9]/40")
                   }
                 >
-                  {size === "Small" ? 'S (7")' : size === "Medium" ? 'M (10")' : size === "Large" ? 'L (13")' : size} · Rs.{price}
+                  {label}{priceLabel}
                 </button>
               );
             })}
