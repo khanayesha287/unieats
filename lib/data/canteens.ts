@@ -20,11 +20,11 @@ export const canteens: Canteen[] = [
   },
   {
     slug: "bhola",
-    name: "Bhola Canteen",
-    description: "Popular campus canteen — menu coming soon.",
+    name: "Bhôla Café",
+    description: "Fresh karahi, biryani, shakes, juices, and tang favourites for students.",
     prepTime: "10–15 min",
     gradient: "from-[#D97706] via-[#F59E0B] to-[#FCD34D]",
-    status: "coming-soon",
+    status: "active",
   },
   {
     slug: "annexe",

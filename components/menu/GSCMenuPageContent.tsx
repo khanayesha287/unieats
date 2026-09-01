@@ -13,19 +13,32 @@ export default function GSCMenuPageContent({ canteenSlug }: GSCMenuPageContentPr
   const items = menuItems.filter((item) => item.canteenSlug === canteenSlug);
   const snacks = items.filter((item) => item.category === "snacks");
   const meals = items.filter((item) => item.category === "meals");
+  const shakes = items.filter((item) => item.category === "shakes-and-juices");
+  const drinks = items.filter((item) => item.category === "drinks");
+  const desi = items.filter((item) => item.category === "desi-food");
+  const additional = items.filter(
+    (item) =>
+      item.category !== "snacks" &&
+      item.category !== "meals" &&
+      item.category !== "shakes-and-juices" &&
+      item.category !== "drinks" &&
+      item.category !== "desi-food"
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#F4C542]">
-            GSSC Canteen
+            {canteenSlug === "gssc" ? "GSSC Canteen" : "Bhôla Café"}
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Menu
           </h1>
           <p className="mt-3 max-w-2xl text-base text-white/80 sm:text-lg">
-            Rolls, samosas, snacks, and quick bites for UET students.
+            {canteenSlug === "gssc"
+              ? "Rolls, samosas, snacks, and quick bites for UET students."
+              : "Fresh karahi, biryani, shakes, juices, and tang favourites for students."}
           </p>
         </div>
         <Link
@@ -53,6 +66,50 @@ export default function GSCMenuPageContent({ canteenSlug }: GSCMenuPageContentPr
           <h2 className="mb-3 text-base font-bold text-white">Meals</h2>
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
             {meals.map((item) => (
+              <FoodCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {shakes.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-base font-bold text-white">Shakes &amp; Juices</h2>
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+            {shakes.map((item) => (
+              <FoodCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {drinks.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-base font-bold text-white">Tang &amp; Drinks</h2>
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+            {drinks.map((item) => (
+              <FoodCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {desi.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-base font-bold text-white">Desi Food</h2>
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+            {desi.map((item) => (
+              <FoodCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {additional.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-base font-bold text-white">More</h2>
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+            {additional.map((item) => (
               <FoodCard key={item.id} item={item} />
             ))}
           </div>
