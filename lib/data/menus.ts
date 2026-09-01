@@ -81,15 +81,17 @@ export function getMenuImage(name: string): string {
   if (normalized.includes("shake")) return "/menu/shakes-juices-category.jpg.png";
   if (normalized.includes("juice") || normalized.includes("tang") || normalized.includes("soda")) return "/menu/shakes-juices-category.jpg.png";
   if (normalized.includes("paratha") || normalized.includes("chai")) return "/menu/chai-paratha-category.jpg.png";
+  if (normalized.includes("samosa") || normalized.includes("roll")) return "/menu/fast-food-category.jpg.png";
   if (normalized.includes("pizza")) return "/menu/pizza.jpg.png";
   if (normalized.includes("burger") || normalized.includes("zinger")) return "/menu/zinger-burger.jpg";
-  if (normalized.includes("shawarma") || normalized.includes("roll")) return "/menu/shawarma-roll.jpg";
+  if (normalized.includes("shawarma")) return "/menu/shawarma-roll.jpg";
   if (normalized.includes("fries") || normalized.includes("pasta")) return "/menu/small-fries.jpg";
   if (normalized.startsWith("deal ")) {
     if (name === "Deal 1") return "/menu/1-sandwich-1-fries.jpg.png";
   }
   return "/menu/placeholder.jpg";
 }
+
 
 export const menuItems: MenuItem[] = [
   {
@@ -1412,7 +1414,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-malai-boti-samosa",
@@ -1424,7 +1426,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-aalo-samosa",
@@ -1436,7 +1438,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-chicken-samosa",
@@ -1448,7 +1450,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-vegetable-roll",
@@ -1460,7 +1462,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-ziger-samosa",
@@ -1472,7 +1474,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-pizza-samosa",
@@ -1484,7 +1486,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-shawarma-roll",
@@ -1496,7 +1498,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-macaroni-samosa",
@@ -1508,7 +1510,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-cheez-samosa",
@@ -1520,7 +1522,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-snacks-seekh-kabab-roll",
@@ -1532,7 +1534,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
 
   // GSSC Canteen — Meals
@@ -1546,7 +1548,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
   {
     id: "gssc-meals-chicken-qeema",
@@ -1558,7 +1560,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-    image: "/menu/placeholder.jpg",
+    
   },
 
 
@@ -1866,3 +1868,4 @@ export function getMenuByCanteen(slug: string): MenuItem[] {
 export function getMenuItemById(id: string): MenuItem | undefined {
   return menuItems.find((item) => item.id === id);
 }
+
