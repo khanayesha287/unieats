@@ -43,7 +43,7 @@ export default function Hero() {
 
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
-              href="/menu/ssc"
+              href="/canteens"
               className="rounded-full bg-[#6C2BD9] px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-1 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
             >
               Order Food

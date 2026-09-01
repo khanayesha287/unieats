@@ -63,7 +63,7 @@ export default function FeaturedMenu() {
                 </div>
                 {isOpen ? (
                   <Link
-                    href="/menu/ssc"
+                    href="/canteens"
                     className="mt-4 flex w-full items-center justify-center rounded-full bg-[#6C2BD9] py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6] hover:shadow-md"
                   >
                     Order Now
