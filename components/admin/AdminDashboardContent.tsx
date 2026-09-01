@@ -40,7 +40,6 @@ interface AdminOrder {
   id: number | string;
   order_number: string;
   student_name: string;
-  registration_number: string;
   phone: string;
   order_type: "pickup" | "delivery";
   delivery_location?: string | null;
@@ -407,7 +406,6 @@ export default function AdminDashboardContent() {
         {
           order_number: orderNumber,
           student_name: "Development Test",
-          registration_number: "DEV-TEST-001",
           phone: "03123456789",
           delivery_location: null,
           order_type: "pickup",
@@ -615,7 +613,6 @@ export default function AdminDashboardContent() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-slate-900">{order.student_name}</div>
-                            <div className="text-xs text-slate-500">{order.registration_number}</div>
                           </td>
                           <td className="px-4 py-3 text-slate-600">
                             {canteen?.name ?? "Unknown canteen"}
@@ -658,10 +655,6 @@ export default function AdminDashboardContent() {
                   <div>
                     <p className="text-slate-500">Student</p>
                     <p className="font-semibold text-slate-900">{selectedOrder.student_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Registration</p>
-                    <p className="font-semibold text-slate-900">{selectedOrder.registration_number}</p>
                   </div>
                   <div>
                     <p className="text-slate-500">Phone</p>

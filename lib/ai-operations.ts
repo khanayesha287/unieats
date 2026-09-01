@@ -81,7 +81,6 @@ interface MinimalOrder {
   id: number | string;
   order_number: string;
   student_name: string;
-  registration_number: string;
   phone?: string | null;
   order_type: string;
   delivery_location?: string | null;

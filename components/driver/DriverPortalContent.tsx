@@ -23,7 +23,6 @@ interface DriverOrder {
   id: number | string;
   order_number: string;
   student_name: string;
-  registration_number: string;
   phone: string;
   order_type: "pickup" | "delivery";
   delivery_location: string | null;
@@ -133,7 +132,7 @@ function coerceOrder(input: unknown): DriverOrder | null {
       ? record.delivery_charge
       : Number(record.delivery_charge ?? 0);
 
-  return {
+   return {
     id:
       typeof id === "number" || typeof id === "string"
         ? id
@@ -142,8 +141,6 @@ function coerceOrder(input: unknown): DriverOrder | null {
       pickString(record, ["order_number", "orderNumber"]) ?? "\u2014",
     student_name:
       pickString(record, ["student_name", "studentName", "name"]) ?? "Unknown",
-    registration_number:
-      pickString(record, ["registration_number", "registrationNumber"]) ?? "\u2014",
     phone: pickString(record, ["phone", "mobile"]) ?? "\u2014",
     order_type: "delivery",
     delivery_location:
@@ -371,7 +368,6 @@ export default function DriverPortalContent() {
       .insert([{
         order_number: orderNumber,
         student_name: "Test Delivery Student",
-        registration_number: "DRV-TEST-001",
         phone: "03001234567",
         delivery_location: "CS Department, Block A",
         order_type: "delivery",
@@ -536,9 +532,6 @@ export default function DriverPortalContent() {
                               <p className="mt-1 text-sm font-medium text-slate-800">
                                 {order.student_name}
                               </p>
-                              <p className="text-xs text-slate-500">
-                                {order.registration_number}
-                              </p>
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-bold text-slate-900">
@@ -589,9 +582,6 @@ export default function DriverPortalContent() {
                                   >
                                     {order.phone}
                                   </a>
-                                  <p className="text-xs text-slate-500">
-                                    {order.registration_number}
-                                  </p>
                                 </div>
                               </div>
 
