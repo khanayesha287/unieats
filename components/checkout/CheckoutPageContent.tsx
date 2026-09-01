@@ -38,6 +38,7 @@ export default function CheckoutPageContent() {
   const [form, setForm] = useState<CheckoutFormData>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const submittedRef = useRef(false);
 
   const canteenGroups = useMemo(() => groupItemsByCanteen(items), [items]);
@@ -95,6 +96,7 @@ export default function CheckoutPageContent() {
 
     const nextErrors = validate();
     setErrors(nextErrors);
+    setOrderError(null);
 
     if (Object.keys(nextErrors).length > 0 || items.length === 0) {
       return;
@@ -103,8 +105,6 @@ export default function CheckoutPageContent() {
     submittedRef.current = true;
     setIsSubmitting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
     const orderNumber = generateOrderNumber();
     const order = buildOrder(orderNumber, form, items);
     const message = formatWhatsAppOrderMessage(order);
@@ -112,17 +112,29 @@ export default function CheckoutPageContent() {
 
     sessionStorage.setItem("unieats-last-order", JSON.stringify(order));
 
-    // Save to Supabase — fire-and-forget; never blocks the student
+    // ── Supabase FIRST: order must be saved before anything else ──
     try {
       await saveOrderToSupabase(order);
     } catch (error) {
-      console.error(
-        "[UniEats] Supabase order save failed (WhatsApp flow continues):",
-        error,
-      );
+      const errMsg =
+        error instanceof Error ? error.message : "Unknown error";
+      // Detailed technical error stays in the console for development;
+      // the student only sees a friendly message.
+      console.error("[UniEats] Supabase order save failed:", errMsg);
+      setOrderError("Unable to place your order. Please try again.");
+      submittedRef.current = false;
+      setIsSubmitting(false);
+      return;
     }
 
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    // ── Supabase succeeded → WhatsApp + redirect ──
+    try {
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      // WhatsApp failure is non-critical — order is already in Supabase
+      console.warn("[UniEats] WhatsApp window could not be opened.");
+    }
+
     clearCart();
     router.push("/order-success");
   };
@@ -173,6 +185,11 @@ export default function CheckoutPageContent() {
         className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_380px]"
         noValidate
       >
+        {orderError && (
+          <div className="lg:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            {orderError}
+          </div>
+        )}
         <section className="space-y-6 rounded-3xl border border-white/60 bg-white/90 p-6 shadow-xl shadow-[#6C2BD9]/5 backdrop-blur-sm sm:p-8">
           <h2 className="text-xl font-bold text-gray-900">Student Information</h2>
 

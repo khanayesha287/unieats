@@ -49,11 +49,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = readStoredCart();
-    const handle = requestAnimationFrame(() => {
+    // setTimeout instead of requestAnimationFrame: rAF never fires while
+    // the tab is hidden (background/prerendered tabs), which would leave
+    // isHydrated false and checkout stuck on its loading skeleton.
+    const handle = window.setTimeout(() => {
       setItems(stored);
       setIsHydrated(true);
-    });
-    return () => cancelAnimationFrame(handle);
+    }, 0);
+    return () => window.clearTimeout(handle);
   }, []);
 
   useEffect(() => {
