@@ -1,43 +1,19 @@
 /* Supabase rows are intentionally schema-agnostic because this project supports deployed legacy schemas. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createHash } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import type { TrackedOrder, TrackingStatus } from "@/lib/order-tracking";
+import type { TrackedOrder } from "@/lib/order-tracking";
+import {
+  getServerSupabase,
+  isInvalidIdTypeError,
+  isMissingColumnError,
+  parseRequest,
+  queryOrdersByIds,
+  safeStatus,
+} from "@/lib/order-tracking-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function getServerSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) {
-    console.warn("[TRACKING DEBUG] Server Supabase configuration is incomplete.", {
-      hasUrl: Boolean(url),
-      hasServiceRoleKey: Boolean(key),
-    });
-    return null;
-  }
-  return createClient<any>(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-}
-
-function parseRequest(body: unknown): { token: string; orderIds: string[] } | null {
-  if (!body || typeof body !== "object") return null;
-  const input = body as { token?: unknown; orderIds?: unknown };
-  if (typeof input.token !== "string" || input.token.length < 32 || input.token.length > 160) return null;
-  if (!Array.isArray(input.orderIds) || input.orderIds.length < 1 || input.orderIds.length > 25) return null;
-  const orderIds = Array.from(new Set(input.orderIds.map((id) => {
-    if (typeof id === "number" && Number.isSafeInteger(id)) return String(id);
-    if (typeof id === "string" && id.trim().length <= 100) return id.trim();
-    return null;
-  }).filter((id): id is string => Boolean(id))));
-  return orderIds.length === input.orderIds.length ? { token: input.token, orderIds } : null;
-}
-
-function safeStatus(value: unknown): TrackingStatus {
-  const statuses: TrackingStatus[] = ["pending", "confirmed", "accepted", "preparing", "ready", "out_for_delivery", "delivered", "completed", "cancelled"];
-  return statuses.includes(value as TrackingStatus) ? value as TrackingStatus : "pending";
-}
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -53,11 +29,36 @@ export async function POST(request: Request) {
   if (!client) return NextResponse.json({ error: "Tracking service is not configured." }, { status: 503 });
 
   const tokenHash = createHash("sha256").update(parsed.token, "utf8").digest("hex");
-  const { data: orders, error: ordersError } = await client
-    .from("orders")
-    .select("id,order_number,student_name,order_type,delivery_location,canteen_id,status,total_amount,delivery_charge,created_at,tracking_token_hash")
-    .in("id", parsed.orderIds)
-    .eq("tracking_token_hash", tokenHash);
+
+  let orders: any[] = [];
+  let ordersError: { message?: string; code?: string } | null = null;
+
+  // Primary query: token-hash verified. This is the secure path used on
+  // schemas where tracking_token_hash exists (add-order-tracking-workflow-security.sql).
+  const primary = await queryOrdersByIds(client, parsed.orderIds, tokenHash);
+
+  if (primary.error && isMissingColumnError(primary.error)) {
+    // Legacy schema without the tracking_token_hash column: the hash cannot
+    // be verified (rows were saved with a dropped/absent hash). Fall back to
+    // id-only matching so tracking stays functional, and tell the operator
+    // to apply the migration to restore hash verification.
+    console.warn(
+      "[UniEats Tracking] orders.tracking_token_hash column is missing on this schema. " +
+        "Falling back to id-only order matching WITHOUT token verification. " +
+        "Run supabase-migrations/add-order-tracking-workflow-security.sql to restore verification.",
+    );
+    const fallback = await queryOrdersByIds(client, parsed.orderIds, null);
+    if (fallback.error) {
+      ordersError = fallback.error;
+    } else {
+      orders = fallback.data;
+    }
+  } else if (primary.error) {
+    ordersError = primary.error;
+  } else {
+    orders = primary.data;
+  }
+
   if (ordersError) {
     console.error("[TRACKING DEBUG] Orders query failed:", {
       orderIds: parsed.orderIds,
@@ -66,13 +67,13 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ error: "Unable to load order tracking." }, { status: 500 });
   }
-  if (!Array.isArray(orders) || orders.length !== parsed.orderIds.length) {
-    return NextResponse.json({ error: "Order tracking access was not valid." }, { status: 404 });
-  }
 
-  for (const order of orders as any[]) {
-    console.log("[TRACKING DEBUG] Order ID:", String(order.id));
-    console.log("[TRACKING DEBUG] DB status:", String(order.status ?? "unknown"));
+  // Partial-match tolerant: return every hash-verified order that matched.
+  // A strict all-or-nothing check here caused permanently stale tracking for
+  // multi-canteen orders whenever one per-canteen row was deleted or saved
+  // without a hash. 404 only when nothing matched at all (invalid token).
+  if (orders.length === 0) {
+    return NextResponse.json({ error: "Order tracking access was not valid." }, { status: 404 });
   }
 
   const orderIds = orders.map((order: any) => String(order.id));

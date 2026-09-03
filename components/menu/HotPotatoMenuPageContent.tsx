@@ -52,14 +52,6 @@ export default function HotPotatoMenuPageContent() {
           </Link>
         </div>
 
-        {/* Important Notice */}
-        <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-left shadow-sm">
-          <p className="text-sm font-semibold text-amber-800">
-            <span className="mr-1.5 inline-block" aria-hidden>⚠️</span>
-            Note: In Disposable cup 10 RS will be charged extra.
-          </p>
-        </div>
-
         {sandwiches.length > 0 && (
           <section className="mb-6">
             <h2 className="mb-3 text-base font-bold text-gray-900">Sandwich</h2>

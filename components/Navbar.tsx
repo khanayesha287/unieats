@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { getRoleBadge } from "@/lib/auth";
 
@@ -37,7 +36,6 @@ function getPortalLinks(role: string | undefined) {
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isOpen } = useSscCanteenStatus();
   const { profile, signOut } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -231,18 +229,12 @@ export default function Navbar() {
             </div>
 
             {/* Order Now CTA */}
-            {isOpen ? (
-              <Link
-                href="/canteens"
-                className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
-              >
-                Order Now
-              </Link>
-            ) : (
-              <span className="rounded-full bg-[#6C2BD9]/70 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25">
-                Order Now
-              </span>
-            )}
+            <Link
+              href="/canteens"
+              className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
+            >
+              Order Now
+            </Link>
           </div>
 
           {/* Mobile hamburger */}
@@ -378,7 +370,6 @@ export default function Navbar() {
                 Staff Login
               </Link>
             )}
-            {isOpen ? (
               <Link
                 href="/canteens"
                 onClick={() => setMenuOpen(false)}
@@ -386,11 +377,6 @@ export default function Navbar() {
               >
                 Order Now
               </Link>
-            ) : (
-              <span className="rounded-full bg-[#6C2BD9]/70 px-5 py-3 text-center text-sm font-semibold text-white">
-                Order Now
-              </span>
-            )}
           </div>
         </div>
       </div>

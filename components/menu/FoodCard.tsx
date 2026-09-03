@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useState } from "react";
 import { Plus, Minus, Check } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import type { MenuItem } from "@/lib/types";
 import { getCanteenName, getCanteenBySlug } from "@/lib/data/canteens";
 import { getMenuImage } from "@/lib/data/menus";
@@ -17,7 +16,6 @@ interface FoodCardProps {
 
 export default function FoodCard({ item, showCanteenBadge = false }: FoodCardProps) {
   const { addItem } = useCart();
-  const { isOpen } = useSscCanteenStatus();
   const [qty, setQty] = useState(1);
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -40,7 +38,7 @@ export default function FoodCard({ item, showCanteenBadge = false }: FoodCardPro
   const imageSrc = item.image ?? getMenuImage(item.name);
   const displaySrc = imgError ? "/menu/placeholder.jpg" : imageSrc;
   const currentPrice = hasSizes && selectedSize ? item.sizes![selectedSize] : item.price;
-  const isOrderingDisabled = !item.available || !isOpen;
+  const isOrderingDisabled = !item.available;
   const isDeal = item.id.includes("-deal-");
 
   const handleAdd = () => {
@@ -149,7 +147,7 @@ export default function FoodCard({ item, showCanteenBadge = false }: FoodCardPro
       <div className="flex shrink-0 flex-col items-end justify-between self-stretch">
         {isOrderingDisabled ? (
           <span className="mt-1 rounded-full border border-gray-200 px-2.5 py-1 text-[11px] font-semibold text-gray-400">
-            {isOpen ? "N/A" : "Closed"}
+            N/A
           </span>
         ) : !expanded ? (
           <button

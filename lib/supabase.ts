@@ -156,9 +156,20 @@ async function resolveCanteenId(
     return false;
   });
 
-  return fallback?.id !== undefined && fallback?.id !== null
-    ? (fallback.id as string | number)
-    : null;
+  if (fallback?.id !== undefined && fallback?.id !== null) {
+    return fallback.id as string | number;
+  }
+
+  // Without a canteen reference the order is invisible to its canteen portal
+  // (which filters by canteen_id), so no staff member can confirm/prepare it
+  // and the student's tracking box stays pending forever. Surface the cause
+  // loudly instead of failing silently.
+  console.warn(
+    `[UniEats] Canteen "${canteenName}" (slug: "${canteenSlug}") was not found in the database canteens table. ` +
+      "The order is saved without a canteen reference, so its portal cannot receive or update it and student tracking stays pending. " +
+      "Add this canteen to the Supabase canteens table to enable its portal and order tracking.",
+  );
+  return null;
 }
 
 

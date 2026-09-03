@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export interface SscCanteenStatus {
   isOpen: boolean;
@@ -7,52 +7,27 @@ export interface SscCanteenStatus {
   operatingHours: string;
 }
 
-const OPENING_HOUR = 7;
-const OPERATING_HOURS = "7:00 AM – 12:00 AM";
+const OPERATING_HOURS = "Open 24 hours, 7 days a week";
 
-export function getSscCanteenStatus(date = new Date()): SscCanteenStatus {
-  const formatter = new Intl.DateTimeFormat("en-PK", {
-    timeZone: "Asia/Karachi",
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-
-  const parts = formatter.formatToParts(date);
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  const second = Number(parts.find((part) => part.type === "second")?.value ?? "0");
-
-  const currentSeconds = hour * 3600 + minute * 60 + second;
-  const openingSeconds = OPENING_HOUR * 3600;
-  const isOpen = currentSeconds >= openingSeconds && currentSeconds < 24 * 3600;
-
+/**
+ * All canteens operate 24/7 — ordering is available at any time of day.
+ * Kept as a function so consumers retain a stable API if hours ever change.
+ */
+export function getSscCanteenStatus(): SscCanteenStatus {
   return {
-    isOpen,
-    label: isOpen ? "Open Now" : "Closed",
-    message: isOpen
-      ? `Open • ${OPERATING_HOURS}`
-      : `Currently closed. Operating hours: ${OPERATING_HOURS}.`,
+    isOpen: true,
+    label: "Open Now",
+    message: `Open 24/7 • ${OPERATING_HOURS}`,
     operatingHours: OPERATING_HOURS,
   };
 }
 
-export function isSscCanteenOpenNow(date = new Date()): boolean {
-  return getSscCanteenStatus(date).isOpen;
+export function isSscCanteenOpenNow(): boolean {
+  return true;
 }
 
 export function useSscCanteenStatus() {
-  const [status, setStatus] = useState<SscCanteenStatus>(() => getSscCanteenStatus());
-
-  useEffect(() => {
-    const refreshStatus = () => setStatus(getSscCanteenStatus());
-
-    refreshStatus();
-    const interval = window.setInterval(refreshStatus, 60000);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
+  // Always open; kept as a hook so existing consumers keep working unchanged.
+  const [status] = useState<SscCanteenStatus>(getSscCanteenStatus);
   return status;
 }

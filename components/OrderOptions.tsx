@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Bike, ShoppingBag } from "lucide-react";
 import SscCanteenStatus from "@/components/ui/SscCanteenStatus";
-import { useSscCanteenStatus } from "@/lib/canteen-hours";
 
 const options = [
   {
@@ -27,8 +26,6 @@ const options = [
 ];
 
 export default function OrderOptions() {
-  const { isOpen } = useSscCanteenStatus();
-
   return (
     <section
       className="relative overflow-hidden bg-gradient-to-b from-white via-[#FAF7FF] to-[#F3EDFF] py-20 lg:py-28"
@@ -71,18 +68,12 @@ export default function OrderOptions() {
                 ))}
               </ul>
 
-              {isOpen ? (
-                <Link
-                  href={option.href}
-                  className="mt-8 inline-flex rounded-full bg-[#6C2BD9] px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
-                >
-                  {option.button}
-                </Link>
-              ) : (
-                <span className="mt-8 inline-flex rounded-full bg-gray-200 px-6 py-3 text-sm font-semibold text-gray-600">
-                  {option.button}
-                </span>
-              )}
+              <Link
+                href={option.href}
+                className="mt-8 inline-flex rounded-full bg-[#6C2BD9] px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
+              >
+                {option.button}
+              </Link>
             </article>
           ))}
         </div>
@@ -92,18 +83,12 @@ export default function OrderOptions() {
           <p className="mx-auto mt-4 max-w-xl text-white/80">
             Save time, avoid queues and enjoy your favorite meals with UniEats.
           </p>
-          {isOpen ? (
-            <Link
-              href="/canteens"
-              className="mt-8 inline-flex rounded-full bg-white px-8 py-4 text-sm font-semibold text-[#6C2BD9] transition-all duration-300 hover:-translate-y-1 hover:bg-[#F4C542] hover:text-[#2E1065]"
-            >
-              Order Now
-            </Link>
-          ) : (
-            <span className="mt-8 inline-flex rounded-full bg-white/70 px-8 py-4 text-sm font-semibold text-[#6C2BD9]">
-              Order Now
-            </span>
-          )}
+          <Link
+            href="/canteens"
+            className="mt-8 inline-flex rounded-full bg-white px-8 py-4 text-sm font-semibold text-[#6C2BD9] transition-all duration-300 hover:-translate-y-1 hover:bg-[#F4C542] hover:text-[#2E1065]"
+          >
+            Order Now
+          </Link>
         </div>
       </div>
     </section>

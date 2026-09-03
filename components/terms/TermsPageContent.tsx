@@ -78,7 +78,7 @@ const sections = [
     number: "9",
     title: "Service Availability",
     content:
-      "UniEats depends on canteen operating hours and food availability. Orders may not be processed when the canteen is closed or when the ordering service is unavailable.",
+      "UniEats depends on food availability. Orders may not be processed when items are unavailable or when the ordering service is unavailable.",
   },
   {
     number: "10",

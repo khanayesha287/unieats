@@ -26,7 +26,7 @@ const faqs = [
   },
   {
     question: "What are your operating hours?",
-    answer: "All canteens are open daily from 7:00 AM to 12:00 AM.",
+    answer: "All canteens are open 24 hours a day, 7 days a week.",
   },
   {
     question: "How can I get help with my order?",
@@ -124,9 +124,7 @@ export default function ContactPageContent() {
               <h3 className="font-bold text-gray-900">Business Hours</h3>
             </div>
             <ul className="mt-4 space-y-2 text-sm text-gray-600" role="list">
-              <li>Monday – Sunday: 7:00 AM – 12:00 AM</li>
-              <li>Fast Food: 10:00 AM – 12:00 AM</li>
-              <li>Girls Hostel Delivery: Until 9:00 PM</li>
+              <li>Monday – Sunday: Open 24 hours, 7 days a week</li>
             </ul>
           </div>
         </aside>

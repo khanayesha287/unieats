@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Coffee, Milk, Sandwich, Soup, UtensilsCrossed } from "lucide-react";
 import SscCanteenStatus from "@/components/ui/SscCanteenStatus";
-import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import { getCanteenBySlug } from "@/lib/data/canteens";
 
 const categories = [
@@ -57,7 +56,6 @@ const categories = [
 
 export default function SSCMenuPageContent() {
   const canteen = getCanteenBySlug("ssc");
-  const { isOpen } = useSscCanteenStatus();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -99,7 +97,7 @@ export default function SSCMenuPageContent() {
                   <Icon className="h-7 w-7" aria-hidden />
                 </div>
                 <span className="absolute bottom-4 left-5 rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#2E1065]">
-                  {isOpen ? "Open now" : "Closed"}
+                  Open now
                 </span>
               </div>
 
@@ -127,14 +125,10 @@ export default function SSCMenuPageContent() {
             );
           }
 
-          return isOpen ? (
+          return (
             <Link key={category.slug} href={`/menu/ssc/${category.slug}`}>
               {cardContent}
             </Link>
-          ) : (
-            <div key={category.slug} aria-disabled="true" className="cursor-not-allowed opacity-80">
-              {cardContent}
-            </div>
           );
         })}
       </div>
