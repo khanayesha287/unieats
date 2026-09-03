@@ -15,7 +15,6 @@ const quickLinks = [
 
 const supportLinks = [
   { label: "Help Center", href: "/help" },
-  { label: "FAQs", href: "/faqs" },
   { label: "Terms & Conditions", href: "/terms" },
   { label: "Privacy Policy", href: "/privacy" },
 ];

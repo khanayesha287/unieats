@@ -34,7 +34,7 @@ export default function CTA() {
           </h2>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/85">
-            Browse the SSC menu, place your order in seconds, and choose Pickup
+            Browse campus canteen menus, place your order in seconds, and choose Pickup
             or Campus Delivery.
           </p>
 

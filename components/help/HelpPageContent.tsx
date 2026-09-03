@@ -17,7 +17,7 @@ const steps = [
     number: "1",
     title: "Browse the Menu",
     description:
-      "Explore the available food items from the SSC Canteen. Browse by category to find your favourite meals, snacks, and drinks.",
+      "Explore the available food items from all campus canteens. Browse by category to find your favourite meals, snacks, and drinks.",
   },
   {
     icon: ShoppingBag,
@@ -45,7 +45,7 @@ const steps = [
     number: "5",
     title: "Choose Order Type",
     description:
-      "Select either Pickup — collect your order from the SSC Canteen — or Delivery — get your food delivered to your department, hostel, or another suitable location on campus.",
+      "Select either Pickup — collect your order from the canteen — or Delivery — get your food delivered to your department, hostel, or another suitable location on campus.",
   },
   {
     icon: CheckCircle,

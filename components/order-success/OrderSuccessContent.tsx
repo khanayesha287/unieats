@@ -169,7 +169,7 @@ export default function OrderSuccessContent() {
             Back Home
           </Link>
           <Link
-            href="/menu/ssc"
+            href="/canteens"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-[#6C2BD9] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F3EDFF]"
           >
             <UtensilsCrossed className="h-4 w-4" aria-hidden />

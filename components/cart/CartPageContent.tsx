@@ -35,10 +35,10 @@ export default function CartPageContent() {
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Your cart is empty</h2>
           <p className="mt-3 text-gray-600">
-            Add delicious meals from the SSC menu to get started.
+            Add delicious meals from any campus canteen to get started.
           </p>
           <Link
-            href="/menu/ssc"
+            href="/canteens"
             className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
           >
             Continue Shopping

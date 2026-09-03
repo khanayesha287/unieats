@@ -172,7 +172,7 @@ export default function CheckoutPageContent() {
             Add items to your cart before completing your order.
           </p>
           <Link
-            href="/menu/ssc"
+            href="/canteens"
             className="mt-8 inline-flex rounded-full bg-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
           >
             Browse Menu

@@ -6,19 +6,23 @@ import { Plus, Minus, Check } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
 import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import type { MenuItem } from "@/lib/types";
-import { getCanteenName } from "@/lib/data/canteens";
+import { getCanteenName, getCanteenBySlug } from "@/lib/data/canteens";
 import { getMenuImage } from "@/lib/data/menus";
 
 interface FoodCardProps {
   item: MenuItem;
+  /** When true, display a small canteen-name badge on the card. */
+  showCanteenBadge?: boolean;
 }
 
-export default function FoodCard({ item }: FoodCardProps) {
+export default function FoodCard({ item, showCanteenBadge = false }: FoodCardProps) {
   const { addItem } = useCart();
   const { isOpen } = useSscCanteenStatus();
   const [qty, setQty] = useState(1);
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
+
+  const canteenData = showCanteenBadge ? getCanteenBySlug(item.canteenSlug) : null;
 
   // Determine if sizes are pizza-style (S/M/L) or flavour-style
   const hasSizes = item.sizes !== undefined;
@@ -124,6 +128,15 @@ export default function FoodCard({ item }: FoodCardProps) {
               );
             })}
           </div>
+        )}
+
+        {/* Canteen badge */}
+        {showCanteenBadge && canteenData && (
+          <span
+            className={`mt-0.5 inline-flex w-fit items-center rounded-full bg-gradient-to-r ${canteenData.gradient} px-2 py-0.5 text-[10px] font-bold text-white shadow-sm`}
+          >
+            {canteenData.name}
+          </span>
         )}
 
         {/* Price */}

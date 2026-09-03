@@ -23,8 +23,11 @@ export const DEPARTMENTS = [
 export const FOOD_CATEGORIES = [
   { id: "all" as const, label: "All" },
   { id: "fast-food" as const, label: "Fast Food" },
+  { id: "meals" as const, label: "Meals" },
   { id: "shakes-and-juices" as const, label: "Shakes & Juices" },
   { id: "chai-and-paratha" as const, label: "Chai & Paratha" },
   { id: "desi-food" as const, label: "Desi Food" },
   { id: "chinese-food" as const, label: "Chinese Food" },
+  { id: "snacks" as const, label: "Snacks" },
+  { id: "tea" as const, label: "Tea" },
 ];

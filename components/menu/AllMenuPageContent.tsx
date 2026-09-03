@@ -107,11 +107,11 @@ export default function AllMenuPageContent() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
         <div className="mb-8 flex flex-col gap-6">
           <Link
-            href="/menu/ssc"
+            href="/canteens"
             className="inline-flex w-fit items-center gap-2 rounded-full border border-[#6C2BD9]/20 bg-white/80 px-4 py-2 text-sm font-medium text-[#6C2BD9] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-[#6C2BD9]/40 hover:bg-white"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to SSC Categories
+            Back to Canteens
           </Link>
 
           <header>
@@ -185,7 +185,7 @@ export default function AllMenuPageContent() {
                         {sec.label}
                       </h2>
                       {sectionItems.map((item) => (
-                        <FoodCard key={item.id} item={item} />
+                        <FoodCard key={item.id} item={item} showCanteenBadge />
                       ))}
                     </div>
                   </div>
@@ -195,7 +195,7 @@ export default function AllMenuPageContent() {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
               {filteredItems.map((item) => (
-                <FoodCard key={item.id} item={item} />
+                <FoodCard key={item.id} item={item} showCanteenBadge />
               ))}
             </div>
           )
