@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { supabase, buildStatusUpdatePayload, deleteOrderFromSupabase } from "@/lib/supabase";
+import { buildStatusUpdatePayload } from "@/lib/supabase";
 import { supabaseAuth } from "@/lib/supabase-auth";
 import type { OrderStatus } from "@/lib/types";
 import { Trash2, MoreVertical, X } from "lucide-react";
@@ -156,7 +156,7 @@ function coerceDriver(input: unknown): AdminDriver | null {
 }
 
 async function fetchDashboardData() {
-  if (!supabase) {
+  if (!supabaseAuth) {
     return {
       canteens: [] as AdminCanteen[],
       drivers: [] as AdminDriver[],
@@ -168,10 +168,14 @@ async function fetchDashboardData() {
   }
 
   const [ordersResult, canteensResult, driversResult, itemsResult] = await Promise.all([
-    supabase.from("orders").select("*"),
-    supabase.from("canteens").select("*"),
-    supabase.from("driver").select("*"),
-    supabase.from("order_items").select("*"),
+    supabaseAuth.from("orders").select("*"),
+    supabaseAuth.from("canteens").select("*"),
+    supabaseAuth
+      .from("staff_profiles")
+      .select("id, name, role, active")
+      .eq("role", "driver")
+      .eq("active", true),
+    supabaseAuth.from("order_items").select("*"),
   ]);
 
   const logTableError = (tableName: string, error: { message?: string } | null) => {
@@ -231,8 +235,33 @@ async function fetchDashboardData() {
   };
 }
 
+interface AdminNotificationSummary {
+  order_id: string;
+  event_type: string;
+  status: "pending" | "processing" | "sent" | "failed";
+  last_error?: string | null;
+  updated_at?: string | null;
+  attempt_count: number;
+}
+
+async function fetchAdminNotificationStatuses(): Promise<AdminNotificationSummary[]> {
+  if (!supabaseAuth) return [];
+  const { data: sessionData } = await supabaseAuth.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) return [];
+  const response = await fetch("/api/admin/notifications/whatsapp/retry", {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as { notifications?: AdminNotificationSummary[] };
+  return Array.isArray(payload.notifications) ? payload.notifications : [];
+}
+
 export default function AdminDashboardContent() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [notificationStatuses, setNotificationStatuses] = useState<AdminNotificationSummary[]>([]);
+  const [retryingNotification, setRetryingNotification] = useState(false);
   const [canteens, setCanteens] = useState<AdminCanteen[]>([]);
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [orderItems, setOrderItems] = useState<AdminOrderItem[]>([]);
@@ -260,14 +289,20 @@ export default function AdminDashboardContent() {
     }
   };
 
+  const loadNotificationStatuses = async () => {
+    setNotificationStatuses(await fetchAdminNotificationStatuses());
+  };
+
   useEffect(() => {
     void loadData();
+    void loadNotificationStatuses();
   }, []);
 
   // Polling fallback every 15 s — silent refresh (no loading flash)
   useEffect(() => {
     const interval = setInterval(() => {
       void loadData(true);
+      void loadNotificationStatuses();
     }, 15_000);
     return () => clearInterval(interval);
   }, []);
@@ -318,6 +353,16 @@ export default function AdminDashboardContent() {
     [orders, selectedOrderId],
   );
 
+  const notificationByOrder = useMemo(() => {
+    const map: Record<string, AdminNotificationSummary[]> = {};
+    for (const notification of notificationStatuses) {
+      const key = String(notification.order_id);
+      if (!map[key]) map[key] = [];
+      map[key].push(notification);
+    }
+    return map;
+  }, [notificationStatuses]);
+
   const canteenMap = useMemo(
     () =>
       Object.fromEntries(
@@ -359,7 +404,17 @@ export default function AdminDashboardContent() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      await deleteOrderFromSupabase(deleteTarget.id);
+      if (!supabaseAuth) throw new Error("Authentication service unavailable.");
+      const { error: itemDeleteError } = await supabaseAuth
+        .from("order_items")
+        .delete()
+        .eq("order_id", deleteTarget.id);
+      if (itemDeleteError) throw new Error(itemDeleteError.message);
+      const { error: orderDeleteError } = await supabaseAuth
+        .from("orders")
+        .delete()
+        .eq("id", deleteTarget.id);
+      if (orderDeleteError) throw new Error(orderDeleteError.message);
       setOrders((current) => current.filter((o) => String(o.id) !== String(deleteTarget.id)));
       if (String(selectedOrderId) === String(deleteTarget.id)) {
         setSelectedOrderId(null);
@@ -376,7 +431,7 @@ export default function AdminDashboardContent() {
   };
 
   const updateOrderStatus = async (orderId: number | string, nextStatus: OrderStatus) => {
-    if (!supabase) return;
+    if (!supabaseAuth) return;
 
     setIsUpdating(true);
 
@@ -384,7 +439,7 @@ export default function AdminDashboardContent() {
     const order = orders.find((o) => String(o.id) === String(orderId));
     const payload = buildStatusUpdatePayload(nextStatus, order as unknown as Record<string, unknown>);
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAuth
       .from("orders")
       .update(payload)
       .eq("id", orderId);
@@ -405,10 +460,10 @@ export default function AdminDashboardContent() {
   };
 
   const updateOrderDriver = async (orderId: number | string, nextDriverId: string) => {
-    if (!supabase) return;
+    if (!supabaseAuth) return;
 
     const normalizedDriverId = nextDriverId === "" ? null : nextDriverId;
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAuth
       .from("orders")
       .update({ driver_id: normalizedDriverId })
       .eq("id", orderId);
@@ -426,6 +481,24 @@ export default function AdminDashboardContent() {
           : order,
       ),
     );
+  };
+
+  const retrySelectedNotification = async () => {
+    if (!selectedOrder || !supabaseAuth) return;
+    const { data: sessionData } = await supabaseAuth.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    setRetryingNotification(true);
+    try {
+      await fetch("/api/admin/notifications/whatsapp/retry", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: [String(selectedOrder.id)] }),
+      });
+      await loadNotificationStatuses();
+    } finally {
+      setRetryingNotification(false);
+    }
   };
 
   const renderSummaryCard = (label: string, value: number, accent: string) => (
@@ -592,6 +665,7 @@ export default function AdminDashboardContent() {
                       <th className="px-4 py-3 font-semibold">Type</th>
                       <th className="px-4 py-3 font-semibold">Payment</th>
                       <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">WhatsApp</th>
                       <th className="px-4 py-3 font-semibold">Time</th>
                       <th className="px-4 py-3 font-semibold">Actions</th>
                     </tr>
@@ -635,6 +709,20 @@ export default function AdminDashboardContent() {
                             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}>
                               {order.status.replace(/_/g, " ")}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {(() => {
+                              const statuses = notificationByOrder[String(order.id)] ?? [];
+                              const failed = statuses.some((item) => item.status === "failed");
+                              const pending = statuses.some((item) => item.status === "pending" || item.status === "processing");
+                              return (
+                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  failed ? "bg-red-100 text-red-700" : pending ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                                }`}>
+                                  {failed ? "Failed" : pending ? "Pending" : statuses.length ? "Sent" : "Not queued"}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-500">
                             {order.created_at ? formatDate(order.created_at) : "\u2014"}
@@ -746,6 +834,21 @@ export default function AdminDashboardContent() {
                     <p className="text-slate-500">Order time</p>
                     <p className="font-semibold text-slate-900">{formatDate(selectedOrder.created_at)}</p>
                   </div>
+                  <div>
+                    <p className="text-slate-500">WhatsApp notifications</p>
+                    <div className="mt-1 space-y-1">
+                      {(notificationByOrder[String(selectedOrder.id)] ?? []).map((notification) => (
+                        <p key={`${notification.order_id}-${notification.event_type}`} className={`text-xs font-semibold ${notification.status === "failed" ? "text-red-600" : notification.status === "sent" ? "text-emerald-600" : "text-amber-600"}`}>
+                          {notification.event_type.replace(/_/g, " ")}: {notification.status}
+                        </p>
+                      ))}
+                      {(notificationByOrder[String(selectedOrder.id)] ?? []).some((item) => item.status === "failed") && (
+                        <button type="button" onClick={() => void retrySelectedNotification()} disabled={retryingNotification} className="mt-2 rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                          {retryingNotification ? "Retrying…" : "Retry failed notifications"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
                   <div>
                     <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -849,17 +952,39 @@ export default function AdminDashboardContent() {
 
         {/* Portals tab */}
         {activeTab === "portals" && (
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900">Canteen Portal</h3>
-              <p className="mt-2 text-sm text-slate-600">Access the full canteen operations portal to manage orders across all canteens.</p>
-              <Link
-                href="/canteen"
-                className="mt-4 inline-flex rounded-full bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
-              >
-                Open Canteen Portal
-              </Link>
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Canteen Portals</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Select any configured canteen to open its operations portal.
+              </p>
             </div>
+            {canteens.length === 0 ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+                No canteens are available in Supabase.
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {canteens.map((canteen) => (
+                  <div
+                    key={String(canteen.id)}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
+                      Canteen Portal
+                    </p>
+                    <h3 className="mt-2 text-lg font-bold text-slate-900">{canteen.name}</h3>
+                    <Link
+                      href={`/canteen?canteen_id=${encodeURIComponent(String(canteen.id))}`}
+                      className="mt-4 inline-flex rounded-full bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
+                    >
+                      Open {canteen.name}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="text-lg font-bold text-slate-900">Driver Portal</h3>
               <p className="mt-2 text-sm text-slate-600">Access the driver portal to monitor deliveries and driver activity.</p>

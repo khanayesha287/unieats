@@ -106,19 +106,7 @@ CREATE POLICY order_items_staff_select ON order_items
     )
   );
 
--- ----------------------------------------------------------------
--- 6. RLS: INSERT policy on orders (for student checkout)
--- ----------------------------------------------------------------
--- Any authenticated user can insert orders (checkout flow).
-DROP POLICY IF EXISTS orders_checkout_insert ON orders;
-CREATE POLICY orders_checkout_insert ON orders
-  FOR INSERT TO authenticated
-  WITH CHECK (true);
-
--- ----------------------------------------------------------------
--- 7. RLS: INSERT policy on order_items (for student checkout)
--- ----------------------------------------------------------------
-DROP POLICY IF EXISTS order_items_checkout_insert ON order_items;
-CREATE POLICY order_items_checkout_insert ON order_items
-  FOR INSERT TO authenticated
-  WITH CHECK (true);
+-- Checkout INSERT policies are defined by
+-- add-order-tracking-workflow-security.sql after tracking_token_hash exists.
+-- Keeping them out of this foundational migration prevents a later rerun from
+-- weakening checkout validation.

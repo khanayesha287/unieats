@@ -5,22 +5,19 @@ import {
   Clock,
   Mail,
   MapPin,
-  MessageCircle,
   Send,
   Camera,
 } from "lucide-react";
 import {
   CONTACT_EMAIL,
   INSTAGRAM_URL,
-  WHATSAPP_DISPLAY,
-  WHATSAPP_URL,
 } from "@/lib/constants";
 
 const faqs = [
   {
     question: "How do I place an order on UniEats?",
     answer:
-      "Browse a campus canteen menu, add items to your cart, complete checkout with your student details, and confirm via WhatsApp.",
+      "Browse a campus canteen menu, add items to your cart, complete checkout with your student details, and confirm your order on the website.",
   },
   {
     question: "Do you offer campus delivery?",
@@ -29,12 +26,12 @@ const faqs = [
   },
   {
     question: "What are your operating hours?",
-    answer: "SSC Canteen is open daily from 7:00 AM to 12:00 AM.",
+    answer: "All canteens are open daily from 7:00 AM to 12:00 AM.",
   },
   {
     question: "How can I get help with my order?",
     answer:
-      "Contact us via WhatsApp or email. Our team responds quickly during business hours.",
+      "Contact us by email. Our team responds quickly during business hours.",
   },
 ];
 
@@ -100,13 +97,6 @@ export default function ContactPageContent() {
         </section>
 
         <aside className="space-y-4">
-          <ContactCard
-            icon={MessageCircle}
-            title="WhatsApp"
-            description={WHATSAPP_DISPLAY}
-            href={WHATSAPP_URL}
-            action="Message on WhatsApp"
-          />
           <ContactCard
             icon={Camera}
             title="Instagram"

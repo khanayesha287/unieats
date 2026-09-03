@@ -21,10 +21,10 @@ export const canteens: Canteen[] = [
   {
     slug: "bhola",
     name: "Bhola Canteen",
-    description: "Popular campus canteen — menu coming soon.",
+    description: "Fresh karahi, desi food, shakes, juices, and refreshing drinks.",
     prepTime: "10–15 min",
     gradient: "from-[#D97706] via-[#F59E0B] to-[#FCD34D]",
-    status: "coming-soon",
+    status: "active",
   },
   {
     slug: "annexe",
@@ -35,12 +35,12 @@ export const canteens: Canteen[] = [
     status: "active",
   },
   {
-    slug: "tippu-center",
-    name: "Tippu Center",
-    description: "Tippu Center canteen — menu coming soon.",
+    slug: "hot-potato",
+    name: "Hot Potato",
+    description: "Sandwiches, fries, teas, and quick bites — fresh and flavourful.",
     prepTime: "10–15 min",
     gradient: "from-[#7C3AED] via-[#8B5CF6] to-[#C4B5FD]",
-    status: "coming-soon",
+    status: "active",
   },
 ];
 

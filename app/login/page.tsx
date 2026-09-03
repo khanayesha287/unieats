@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getRedirectForRole } from "@/lib/auth";
+import { getRedirectForRole, hasAccessToRoute } from "@/lib/auth";
 import { supabaseAuth } from "@/lib/supabase-auth";
 import Link from "next/link";
 import Image from "next/image";
@@ -27,7 +27,10 @@ function LoginForm() {
   // If already logged in with a profile, redirect
   useEffect(() => {
     if (!authLoading && profile) {
-      const target = redirect || getRedirectForRole(profile.role);
+      const target =
+        redirect && hasAccessToRoute(profile.role, redirect)
+          ? redirect
+          : getRedirectForRole(profile.role);
       router.replace(target);
     }
   }, [authLoading, profile, redirect, router]);

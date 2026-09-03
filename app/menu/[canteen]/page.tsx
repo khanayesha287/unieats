@@ -7,6 +7,8 @@ import SSCMenuPageContent from "@/components/menu/SSCMenuPageContent";
 import GSCMenuPageContent from "@/components/menu/GSCMenuPageContent";
 import ComingSoonCanteenContent from "@/components/menu/ComingSoonCanteenContent";
 import AnnexeMenuPageContent from "@/components/menu/AnnexeMenuPageContent";
+import BholaMenuPageContent from "@/components/menu/BholaMenuPageContent";
+import HotPotatoMenuPageContent from "@/components/menu/HotPotatoMenuPageContent";
 import { createMetadata } from "@/lib/seo";
 import { getCanteenBySlug } from "@/lib/data/canteens";
 
@@ -49,14 +51,18 @@ export default async function CanteenMenuPage({ params }: MenuPageProps) {
       <Navbar />
       <PageShell>
         {canteen === "ssc" ? (
-        <SSCMenuPageContent />
-      ) : canteen === "annexe" ? (
-        <AnnexeMenuPageContent />
-      ) : canteenData.status === "coming-soon" ? (
-        <ComingSoonCanteenContent canteen={canteenData} />
-      ) : (
-        <GSCMenuPageContent canteenSlug={canteen} />
-      )}
+          <SSCMenuPageContent />
+        ) : canteen === "annexe" ? (
+          <AnnexeMenuPageContent />
+        ) : canteen === "bhola" ? (
+          <BholaMenuPageContent />
+        ) : canteen === "hot-potato" ? (
+          <HotPotatoMenuPageContent />
+        ) : canteenData.status === "coming-soon" ? (
+          <ComingSoonCanteenContent canteen={canteenData} />
+        ) : (
+          <GSCMenuPageContent canteenSlug={canteen} />
+        )}
       </PageShell>
       <Footer />
     </>

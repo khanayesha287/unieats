@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { supabase, buildStatusUpdatePayload } from "@/lib/supabase";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { buildStatusUpdatePayload } from "@/lib/supabase";
 import { supabaseAuth } from "@/lib/supabase-auth";
 import { useAuth } from "@/components/providers/AuthProvider";
 
-export type CanteenStatus = "pending" | "confirmed" | "preparing" | "ready";
+export type CanteenStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "out_for_delivery"
+  | "delivered"
+  | "completed"
+  | "cancelled";
 
 interface CanteenRecord {
   id: number | string;
@@ -40,6 +49,10 @@ const STATUS_STYLES: Record<CanteenStatus, string> = {
   confirmed: "bg-sky-100 text-sky-800",
   preparing: "bg-violet-100 text-violet-800",
   ready: "bg-emerald-100 text-emerald-800",
+  out_for_delivery: "bg-cyan-100 text-cyan-800",
+  delivered: "bg-blue-100 text-blue-800",
+  completed: "bg-green-100 text-green-800",
+  cancelled: "bg-red-100 text-red-800",
 };
 
 const STATUS_LABELS: Record<CanteenStatus, string> = {
@@ -47,6 +60,10 @@ const STATUS_LABELS: Record<CanteenStatus, string> = {
   confirmed: "Accepted",
   preparing: "Preparing",
   ready: "Ready",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Delivered",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 function pickString(
@@ -69,9 +86,20 @@ function isMissingTableError(error: { message?: string } | null): boolean {
 }
 
 function normalizeStatus(value: unknown): CanteenStatus {
-  const valid: CanteenStatus[] = ["pending", "confirmed", "preparing", "ready"];
+  const valid: CanteenStatus[] = [
+    "pending",
+    "confirmed",
+    "preparing",
+    "ready",
+    "out_for_delivery",
+    "delivered",
+    "completed",
+    "cancelled",
+  ];
   const normalized = typeof value === "string" ? value : "pending";
-  return valid.includes(normalized as CanteenStatus) ? (normalized as CanteenStatus) : "pending";
+  return valid.includes(normalized as CanteenStatus)
+    ? (normalized as CanteenStatus)
+    : "pending";
 }
 
 function toCurrency(value: number): string {
@@ -176,7 +204,7 @@ function coerceOrderItem(input: unknown): PortalOrderItem | null {
 }
 
 async function fetchPortalData() {
-  if (!supabase) {
+  if (!supabaseAuth) {
     return {
       canteens: [] as CanteenRecord[],
       orders: [] as PortalOrder[],
@@ -186,9 +214,9 @@ async function fetchPortalData() {
   }
 
   const [ordersResult, canteensResult, itemsResult] = await Promise.all([
-    supabase.from("orders").select("*"),
-    supabase.from("canteens").select("*"),
-    supabase.from("order_items").select("*"),
+    supabaseAuth.from("orders").select("*"),
+    supabaseAuth.from("canteens").select("*"),
+    supabaseAuth.from("order_items").select("*"),
   ]);
 
   if (ordersResult.error && !isMissingTableError(ordersResult.error)) {
@@ -229,8 +257,11 @@ async function fetchPortalData() {
   };
 }
 
-export default function CanteenPortalContent() {
+function CanteenPortalContentInner() {
   const { profile } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedCanteenId = searchParams.get("canteen_id");
   const [canteens, setCanteens] = useState<CanteenRecord[]>([]);
   const [orders, setOrders] = useState<PortalOrder[]>([]);
   const [items, setItems] = useState<PortalOrderItem[]>([]);
@@ -239,15 +270,17 @@ export default function CanteenPortalContent() {
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Lock canteen_owner to their assigned canteen
+  // Owners are always canonicalized to the database-assigned canteen.
+  // Admin selection is derived from the URL/state and is never reset by data refreshes.
   useEffect(() => {
-    if (profile?.role === "canteen_owner" && profile.canteen_id && canteens.length > 0) {
-      const matched = canteens.find(c => String(c.id) === String(profile.canteen_id));
-      if (matched) setSelectedCanteenId(matched.id);
-    }
-  }, [profile, canteens]);
+    if (profile?.role !== "canteen_owner" || !profile.canteen_id) return;
+    if (requestedCanteenId === String(profile.canteen_id)) return;
+    router.replace(`/canteen?canteen_id=${encodeURIComponent(String(profile.canteen_id))}`, {
+      scroll: false,
+    });
+  }, [profile?.canteen_id, profile?.role, requestedCanteenId, router]);
 
-  const loadData = async (silent = false) => {
+  const loadData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     const data = await fetchPortalData();
     setCanteens(data.canteens);
@@ -255,12 +288,11 @@ export default function CanteenPortalContent() {
     setItems(data.items);
     setError(data.error);
     if (!silent) setIsLoading(false);
-    if (!selectedCanteenId && data.canteens.length > 0) {
-      setSelectedCanteenId(data.canteens[0].id);
-    }
-  };
+  }, []);
 
-  useEffect(() => { void loadData(); }, []);
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   // Polling every 15 s — silent refresh (no loading flash)
   useEffect(() => {
@@ -268,7 +300,7 @@ export default function CanteenPortalContent() {
       void loadData(true);
     }, 15_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     if (!supabaseAuth) return;
@@ -280,17 +312,27 @@ export default function CanteenPortalContent() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "order_items" }, () => { void loadData(true); })
       .subscribe();
     return () => { if (supabaseAuth) void supabaseAuth.removeChannel(channel); };
-  }, []);
+  }, [loadData]);
 
   const canteenMap = useMemo(
     () => Object.fromEntries(canteens.map((c) => [String(c.id), c])) as Record<string, CanteenRecord>,
     [canteens],
   );
 
+  const requestedCanteen = canteens.find(
+    (canteen) => String(canteen.id) === requestedCanteenId,
+  );
+  const effectiveSelectedCanteenId =
+    profile?.role === "canteen_owner"
+      ? profile.canteen_id ?? null
+      : selectedCanteenId ?? requestedCanteen?.id ?? canteens[0]?.id ?? null;
+
   const filteredOrders = useMemo(() => {
-    if (!selectedCanteenId) return [];
-    return orders.filter((o) => String(o.canteen_id ?? "") === String(selectedCanteenId));
-  }, [orders, selectedCanteenId]);
+    if (!effectiveSelectedCanteenId) return [];
+    return orders.filter(
+      (o) => String(o.canteen_id ?? "") === String(effectiveSelectedCanteenId),
+    );
+  }, [effectiveSelectedCanteenId, orders]);
 
   const itemsByOrder = useMemo(() => {
     return items.reduce<Record<string, PortalOrderItem[]>>((acc, item) => {
@@ -303,12 +345,12 @@ export default function CanteenPortalContent() {
 
   // Status update with timestamps and fallback
   const updateOrderStatus = async (orderId: number | string, nextStatus: CanteenStatus) => {
-    if (!supabase) return;
+    if (!supabaseAuth) return;
     setIsUpdating(true);
 
     let payload: Record<string, unknown> = { status: nextStatus };
     try {
-      const { data: existing } = await supabase
+      const { data: existing } = await supabaseAuth
         .from("orders")
         .select("confirmed_at,preparing_at,ready_at")
         .eq("id", orderId)
@@ -316,13 +358,13 @@ export default function CanteenPortalContent() {
       payload = buildStatusUpdatePayload(nextStatus, existing ?? undefined);
     } catch { /* timestamp columns may not exist */ }
 
-    let { error: updateError } = await supabase
+    let { error: updateError } = await supabaseAuth
       .from("orders")
       .update(payload)
       .eq("id", orderId);
 
     if (updateError && Object.keys(payload).length > 1) {
-      const { error: retryError } = await supabase
+      const { error: retryError } = await supabaseAuth
         .from("orders")
         .update({ status: nextStatus })
         .eq("id", orderId);
@@ -343,20 +385,24 @@ export default function CanteenPortalContent() {
     setError(null);
   };
 
-  // Group orders into 3 workflow buckets
+  // Group orders into workflow buckets.
+  // Only show orders that are still within the canteen's active workflow
+  // (pending → preparing → ready).  Orders that have moved to driver
+  // territory (out_for_delivery, delivered, completed, cancelled) are
+  // excluded from the active buckets so they never reappear.
   const newOrders = filteredOrders.filter((o) => o.status === "pending");
-  const acceptedOrders = filteredOrders.filter(
-    (o) => o.status === "confirmed" || o.status === "preparing",
-  );
+  const acceptedOrders = filteredOrders.filter((o) => o.status === "confirmed");
+  const preparingOrders = filteredOrders.filter((o) => o.status === "preparing");
   const readyOrders = filteredOrders.filter((o) => o.status === "ready");
 
   const summaryCards = [
     { label: "New Orders", value: newOrders.length, accent: "bg-amber-100 text-amber-700" },
-    { label: "Preparing", value: acceptedOrders.length, accent: "bg-sky-100 text-sky-700" },
+    { label: "Accepted", value: acceptedOrders.length, accent: "bg-sky-100 text-sky-700" },
+    { label: "Preparing", value: preparingOrders.length, accent: "bg-violet-100 text-violet-700" },
     { label: "Ready", value: readyOrders.length, accent: "bg-emerald-100 text-emerald-700" },
   ];
 
-  const renderOrderCard = (order: PortalOrder, action: "accept" | "ready" | null) => {
+  const renderOrderCard = (order: PortalOrder, action: "accept" | "prepare" | "ready" | null) => {
     const orderItems = itemsByOrder[String(order.id)] ?? [];
     const isNew = order.status === "pending" && isRecentOrder(order.created_at);
     const canteenName = order.canteen_id
@@ -451,7 +497,17 @@ export default function CanteenPortalContent() {
                 onClick={() => void updateOrderStatus(order.id, "confirmed")}
                 className="w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white shadow-md transition hover:bg-violet-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {isUpdating ? "Updating..." : "Order Accepted"}
+                {isUpdating ? "Updating..." : "Accept Order"}
+              </button>
+            )}
+            {action === "prepare" && (
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => void updateOrderStatus(order.id, "preparing")}
+                className="w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white shadow-md transition hover:bg-violet-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {isUpdating ? "Updating..." : "Start Preparing"}
               </button>
             )}
             {action === "ready" && (
@@ -473,7 +529,7 @@ export default function CanteenPortalContent() {
   const renderBucket = (
     title: string,
     bucketOrders: PortalOrder[],
-    action: "accept" | "ready" | null,
+    action: "accept" | "prepare" | "ready" | null,
     emptyIcon: string,
     emptyText: string,
   ) => (
@@ -513,8 +569,16 @@ export default function CanteenPortalContent() {
           <div className="flex flex-wrap items-center gap-3">
             {canteens.length > 0 && (
               <select
-                value={String(selectedCanteenId ?? "")}
-                onChange={(e) => setSelectedCanteenId(e.target.value || null)}
+                value={String(effectiveSelectedCanteenId ?? "")}
+                onChange={(e) => {
+                  const nextId = e.target.value || null;
+                  setSelectedCanteenId(nextId);
+                  if (nextId) {
+                    router.replace(`/canteen?canteen_id=${encodeURIComponent(nextId)}`, {
+                      scroll: false,
+                    });
+                  }
+                }}
                 disabled={profile?.role === "canteen_owner"}
                 className={`rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 ${
                   profile?.role === "canteen_owner" ? "cursor-not-allowed opacity-70" : ""
@@ -537,7 +601,7 @@ export default function CanteenPortalContent() {
         )}
 
         {/* Summary cards */}
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {summaryCards.map((card) => (
             <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${card.accent}`}>
@@ -555,11 +619,26 @@ export default function CanteenPortalContent() {
         ) : (
           <div className="space-y-8">
             {renderBucket("New Orders", newOrders, "accept", "\u{1F4E8}", "No new orders waiting.")}
-            {renderBucket("Accepted & Preparing", acceptedOrders, "ready", "\u{1F373}", "No orders being prepared.")}
-            {renderBucket("Ready for Pickup", readyOrders, null, "\u2705", "No orders ready yet.")}
+            {renderBucket("Accepted", acceptedOrders, "prepare", "\u{1F4CB}", "No accepted orders waiting.")}
+            {renderBucket("Preparing", preparingOrders, "ready", "\u{1F373}", "No orders being prepared.")}
+            {renderBucket("Ready for Pickup / Delivery", readyOrders, null, "\u2705", "No orders ready yet.")}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function CanteenPortalContent() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#f8f5ff] text-sm text-slate-600">
+          Loading portal…
+        </div>
+      }
+    >
+      <CanteenPortalContentInner />
+    </Suspense>
   );
 }

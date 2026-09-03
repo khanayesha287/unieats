@@ -86,7 +86,7 @@ function normalizeMenuItemId(value: unknown): string | number | null {
 
 /**
  * Normalizes a canteen name or slug for matching: "SSC Canteen" → "ssc",
- * "Tippu Center" → "tippucenter".
+ * "Hot Potato" → "hotpotato".
  */
 function normalizeCanteenKey(value: string): string {
   return value
@@ -132,43 +132,101 @@ async function resolveCanteenId(
     return (key !== "" && key === slugKey) || (key !== "" && key === nameKey);
   });
 
-  return normalized?.id !== undefined && normalized?.id !== null
-    ? (normalized.id as string | number)
+  if (normalized?.id !== undefined && normalized?.id !== null) {
+    return normalized.id as string | number;
+  }
+
+  // Last-resort substring match: handles cases where DB stores e.g.
+  // "Bhola" and the frontend sends canteenName "Bhola Canteen" but
+  // normalization strips differently.  Avoids false positives like
+  // "SSC" matching "GSSC" by requiring the shorter key to be at least
+  // 60 % of the longer key's length.
+  const fallback = rows.find((row) => {
+    if (typeof row.name !== "string") return false;
+    const key = normalizeCanteenKey(row.name);
+    if (!key || (!slugKey && !nameKey)) return false;
+    for (const candidate of [slugKey, nameKey]) {
+      if (!candidate) continue;
+      const shorter = key.length < candidate.length ? key : candidate;
+      const longer = key.length < candidate.length ? candidate : key;
+      if (longer.includes(shorter) && shorter.length / longer.length >= 0.6) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  return fallback?.id !== undefined && fallback?.id !== null
+    ? (fallback.id as string | number)
     : null;
 }
 
-async function resolveDriverId(): Promise<string | number | null> {
-  if (!supabase) {
-    return null;
-  }
-
-  const { data, error } = await supabase
-    .from("driver")
-    .select("id")
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.warn(
-      "[UniEats] Unable to find an active driver record for delivery order:",
-      {
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-      },
-    );
-    return null;
-  }
-
-  return data?.id ?? null;
-}
 
 export interface SaveOrderOptions {
   /**
    * Initial status for the order. Defaults to "pending".
    */
   status?: string;
+  /** SHA-256 hash of the guest tracking token; raw tokens never enter the database. */
+  trackingTokenHash?: string;
+}
+
+/**
+ * Generates `count` unique 3-digit order numbers (100–999) that do not
+ * collide with existing rows in the `orders` table.
+ *
+ * Strategy:
+ *  1. Fetch all existing order_numbers in one query.
+ *  2. Build a Set for O(1) lookup.
+ *  3. Generate random candidates, skipping taken ones.
+ *  4. Retry up to 5 rounds if the candidate space gets tight.
+ *
+ * Throws if the space is exhausted (extremely unlikely for < 900 orders
+ * in the active window, but the function handles it safely).
+ */
+export async function generateUniqueOrderNumbers(
+  count: number,
+): Promise<string[]> {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const MAX_RETRIES = 5;
+  const generated: string[] = [];
+
+  // Fetch existing order_numbers in a single query
+  const { data: existingRows } = await supabase
+    .from("orders")
+    .select("order_number");
+
+  const taken = new Set<string>();
+  if (Array.isArray(existingRows)) {
+    for (const row of existingRows) {
+      const val = (row as Record<string, unknown>).order_number;
+      if (typeof val === "string") taken.add(val);
+    }
+  }
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    let safetyCounter = 0;
+    while (generated.length < count && safetyCounter < 5000) {
+      safetyCounter++;
+      const candidate = String(Math.floor(Math.random() * 900) + 100);
+      if (!taken.has(candidate)) {
+        generated.push(candidate);
+        taken.add(candidate); // prevent self-collision within this batch
+      }
+    }
+    if (generated.length >= count) break;
+  }
+
+  if (generated.length < count) {
+    throw new Error(
+      `Unable to generate ${count} unique order numbers — available number space is nearly exhausted. Please contact support.`,
+    );
+  }
+
+  return generated;
 }
 
 /**
@@ -191,16 +249,31 @@ export async function saveOrderToSupabase(
   const initialStatus = options.status ?? "pending";
   const createdOrderIds: (string | number)[] = [];
 
-  // Resolve driver once for delivery orders
-  const driverId =
-    order.orderType === "delivery" ? await resolveDriverId() : null;
+  // Driver assignment is handled post-checkout by admin.
+  // Do NOT insert driver_id at order creation time — doing so caused
+  // FK / missing-table failures that rolled back multi-canteen checkouts.
+
+  // Generate one unique 3-digit order number per canteen group.
+  // Each DB order record MUST have its own unique order_number
+  // (the column has a UNIQUE constraint).
+  const uniqueOrderNumbers = await generateUniqueOrderNumbers(
+    order.canteenOrders.length,
+  );
+
+  // Use the first generated number as the customer-facing checkout reference
+  // shown on the website confirmation page.
+  order.orderNumber = uniqueOrderNumbers[0];
 
   // Delivery charge per canteen order (Rs. 25 per canteen for delivery, 0 for pickup)
   const perCanteenDelivery =
     order.orderType === "delivery" ? DELIVERY_FEE_PER_CANTEEN : 0;
 
   try {
-    for (const group of order.canteenOrders) {
+    for (let i = 0; i < order.canteenOrders.length; i++) {
+      const group = order.canteenOrders[i];
+      // Assign unique order number to this canteen group
+      const groupOrderNumber = uniqueOrderNumbers[i];
+      group.orderNumber = groupOrderNumber;
       // Resolve canteen_id for THIS group
       const canteenId = await resolveCanteenId(
         group.canteenSlug,
@@ -209,7 +282,7 @@ export async function saveOrderToSupabase(
 
       // Build order record for this canteen group
       const orderRecord: Record<string, unknown> = {
-        order_number: order.orderNumber,
+        order_number: groupOrderNumber,
         student_name: order.studentName,
         registration_number: order.registrationNumber?.trim() || null,
         phone: order.phone,
@@ -224,9 +297,9 @@ export async function saveOrderToSupabase(
         total_amount: Number(group.subtotal + perCanteenDelivery),
         delivery_charge: Number(perCanteenDelivery),
         discount: Number(perCanteenDelivery > 0 ? 25 : 0),
-        driver_id: driverId,
         payment_method: order.paymentMethod ?? null,
         special_instructions: order.specialInstructions ?? null,
+        tracking_token_hash: options.trackingTokenHash ?? null,
       };
 
       // Insert with column-dropping fallback for missing optional columns
@@ -283,6 +356,7 @@ export async function saveOrderToSupabase(
       }
 
       createdOrderIds.push(orderId);
+      group.orderId = orderId;
 
       // Insert order_items for THIS canteen group only
       const itemsToInsert = group.items.map((item) => ({

@@ -13,7 +13,7 @@ const options = [
       "Order your food online and pick it up when it's ready. No waiting in long queues.",
     features: ["Skip Waiting", "Ready on Arrival", "Fast Collection"],
     button: "Choose Pickup",
-    href: "/menu/ssc",
+    href: "/canteens",
   },
   {
     icon: Bike,
@@ -22,7 +22,7 @@ const options = [
       "Stay in class or your department while our UniEats rider delivers your order across campus.",
     features: ["Campus Delivery", "Fast Rider Service", "Convenient Ordering"],
     button: "Choose Delivery",
-    href: "/menu/ssc",
+    href: "/canteens",
   },
 ];
 
@@ -94,7 +94,7 @@ export default function OrderOptions() {
           </p>
           {isOpen ? (
             <Link
-              href="/menu/ssc"
+              href="/canteens"
               className="mt-8 inline-flex rounded-full bg-white px-8 py-4 text-sm font-semibold text-[#6C2BD9] transition-all duration-300 hover:-translate-y-1 hover:bg-[#F4C542] hover:text-[#2E1065]"
             >
               Order Now

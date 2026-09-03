@@ -7,9 +7,12 @@ export type FoodCategory =
   | "shakes-and-juices"
   | "chai-and-paratha"
   | "desi-food"
-  | "chinese-food";
+  | "chinese-food"
+  | "tea";
 
 export type CategoryFilter = "all" | FoodCategory;
+
+export type MenuSection = "karahi" | "desi-food" | "shakes-and-juices" | "tang-and-drinks";
 
 export interface Canteen {
   slug: string;
@@ -33,6 +36,7 @@ export interface MenuItem {
   gradient: string;
   image?: string;
   sizes?: Record<string, number>;
+  menuSection?: MenuSection;
 }
 
 export interface CartItem {
@@ -82,6 +86,10 @@ export interface CanteenOrderGroup {
   canteenName: string;
   items: CartItem[];
   subtotal: number;
+  /** Unique 3-digit order number assigned at insert time (populated by saveOrderToSupabase). */
+  orderNumber?: string;
+  /** Database order ID populated after the group is saved. */
+  orderId?: string | number;
 }
 
 export interface Order {
@@ -100,4 +108,6 @@ export interface Order {
   deliveryFee: number;
   grandTotal: number;
   timestamp: string;
+  /** Guest tracking token retained only in browser storage, never sent as a database field. */
+  trackingToken?: string;
 }

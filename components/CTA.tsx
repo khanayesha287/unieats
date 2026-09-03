@@ -45,7 +45,7 @@ export default function CTA() {
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             {isOpen ? (
               <Link
-                href="/menu/ssc"
+                href="/canteens"
                 className="w-full rounded-full bg-white px-8 py-4 text-sm font-semibold text-[#6C2BD9] shadow-lg transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-[#F4C542] hover:text-[#2E1065] sm:w-auto"
               >
                 Order Now

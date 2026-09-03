@@ -1,12 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Mail, MessageCircle } from "lucide-react";
+import { Mail } from "lucide-react";
 import { FaInstagram } from "react-icons/fa";
 import {
   CONTACT_EMAIL,
   INSTAGRAM_URL,
-  WHATSAPP_DISPLAY,
-  WHATSAPP_URL,
 } from "@/lib/constants";
 
 const quickLinks = [
@@ -97,26 +95,6 @@ export default function Footer() {
             </h3>
 
             <ul className="space-y-4 text-sm">
-              <li>
-                <a
-                  href={WHATSAPP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group inline-flex items-center gap-3 text-white/70 transition-colors hover:text-[#F4C542]"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 group-hover:bg-[#F4C542]/20">
-                    <MessageCircle className="h-4 w-4" />
-                  </span>
-
-                  <span>
-                    <span className="block font-medium text-white/90">
-                      WhatsApp
-                    </span>
-                    {WHATSAPP_DISPLAY}
-                  </span>
-                </a>
-              </li>
-
               <li>
                 <a
                   href={INSTAGRAM_URL}

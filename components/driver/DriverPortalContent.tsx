@@ -1,8 +1,9 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildStatusUpdatePayload, supabase } from "@/lib/supabase";
+import { buildStatusUpdatePayload } from "@/lib/supabase";
 import { supabaseAuth } from "@/lib/supabase-auth";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 type DriverStatus = "ready" | "out_for_delivery" | "delivered";
 
@@ -34,6 +35,7 @@ interface DriverOrder {
   delivery_charge: number;
   payment_method?: string | null;
   created_at: string | null;
+  driver_id?: string | number | null;
 }
 
 const DRIVER_STATUSES: DriverStatus[] = ["ready", "out_for_delivery", "delivered"];
@@ -199,6 +201,7 @@ function coerceOrderItem(input: unknown): DriverOrderItem | null {
 }
 
 export default function DriverPortalContent() {
+  const { profile } = useAuth();
   const [orders, setOrders] = useState<DriverOrder[]>([]);
   const [items, setItems] = useState<DriverOrderItem[]>([]);
   const [canteens, setCanteens] = useState<CanteenRecord[]>([]);
@@ -209,16 +212,27 @@ export default function DriverPortalContent() {
   const [showCompleted, setShowCompleted] = useState(false);
 
   const loadData = useCallback(async (silent = false) => {
-    if (!supabase) {
+    if (!supabaseAuth) {
       setError("Supabase is not configured.");
       setIsLoading(false);
       return;
     }
 
+    if (profile?.role === "driver" && !profile.id) {
+      setError("Driver profile is not available.");
+      setIsLoading(false);
+      return;
+    }
+
+    let ordersQuery = supabaseAuth.from("orders").select("*").eq("order_type", "delivery");
+    if (profile?.role === "driver") {
+      ordersQuery = ordersQuery.eq("driver_id", profile.id);
+    }
+
     const [ordersResult, canteensResult, itemsResult] = await Promise.all([
-      supabase.from("orders").select("*").eq("order_type", "delivery"),
-      supabase.from("canteens").select("*"),
-      supabase.from("order_items").select("*"),
+      ordersQuery,
+      supabaseAuth.from("canteens").select("*"),
+      supabaseAuth.from("order_items").select("*"),
     ]);
 
     if (ordersResult.error && !isMissingTableError(ordersResult.error)) {
@@ -261,7 +275,7 @@ export default function DriverPortalContent() {
     setItems(newItems);
     setError(hasRealError ? "Some queries failed. Check console." : null);
     if (!silent) setIsLoading(false);
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     void loadData();
@@ -337,12 +351,12 @@ export default function DriverPortalContent() {
   );
 
   const updateStatus = async (orderId: number | string, nextStatus: string) => {
-    if (!supabase) return;
+    if (!supabaseAuth) return;
 
     // Build payload with timestamp; fall back to status-only if columns don't exist
     let payload: Record<string, unknown> = { status: nextStatus };
     try {
-      const { data: existing } = await supabase
+      const { data: existing } = await supabaseAuth
         .from("orders")
         .select("ready_at,out_for_delivery_at,delivered_at")
         .eq("id", orderId)
@@ -351,17 +365,25 @@ export default function DriverPortalContent() {
     } catch { /* columns may not exist yet */ }
 
     setIsUpdating(true);
-    let { error: updateError } = await supabase
+    let updateQuery = supabaseAuth
       .from("orders")
       .update(payload)
       .eq("id", orderId);
+    if (profile?.role === "driver") {
+      updateQuery = updateQuery.eq("driver_id", profile.id);
+    }
+    let { error: updateError } = await updateQuery;
 
     // If update failed (e.g. missing timestamp columns), retry with status-only
     if (updateError && Object.keys(payload).length > 1) {
-      const { error: retryError } = await supabase
+      let retryQuery = supabaseAuth
         .from("orders")
         .update({ status: nextStatus })
         .eq("id", orderId);
+      if (profile?.role === "driver") {
+        retryQuery = retryQuery.eq("driver_id", profile.id);
+      }
+      const { error: retryError } = await retryQuery;
       updateError = retryError;
     }
 

@@ -7,7 +7,7 @@ import { createMetadata } from "@/lib/seo";
 export const metadata = createMetadata({
   title: "Contact",
   description:
-    "Get in touch with UniEats. Contact us via WhatsApp, email, or our contact form for support at UET Lahore.",
+    "Get in touch with UniEats by email or through our contact form for support at UET Lahore.",
   path: "/contact",
 });
 

@@ -1,5 +1,5 @@
 import { MessageCircle } from "lucide-react";
-import { WHATSAPP_URL } from "@/lib/constants";
+import { CONTACT_EMAIL } from "@/lib/constants";
 
 const sections = [
   {
@@ -97,17 +97,15 @@ export default function PrivacyPageContent() {
           Privacy questions?
         </h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-gray-600">
-          Contact UniEats Support on WhatsApp for any privacy-related questions
+          Contact UniEats Support by email for any privacy-related questions
           or concerns.
         </p>
         <a
-          href={WHATSAPP_URL}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={`mailto:${CONTACT_EMAIL}`}
           className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#6C2BD9] px-7 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
         >
           <MessageCircle className="h-4 w-4" aria-hidden />
-          WhatsApp Support
+          Email Support
         </a>
       </section>
     </div>

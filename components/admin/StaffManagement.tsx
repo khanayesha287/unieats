@@ -12,7 +12,6 @@ interface CanteenOption {
 
 interface StaffFormData {
   email: string;
-  password: string;
   name: string;
   role: Role;
   canteen_id: string;
@@ -20,7 +19,6 @@ interface StaffFormData {
 
 const EMPTY_FORM: StaffFormData = {
   email: "",
-  password: "",
   name: "",
   role: "canteen_owner",
   canteen_id: "",
@@ -83,41 +81,43 @@ export default function StaffManagement() {
 
   const handleCreate = async () => {
     if (!supabaseAuth) return;
-    if (!form.email || !form.password || !form.name) {
-      setError("Name, email, and password are required.");
+    if (!form.email || !form.name) {
+      setError("Name and email are required.");
+      return;
+    }
+    if (form.role === "canteen_owner" && !form.canteen_id) {
+      setError("Select the canteen this owner is allowed to manage.");
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
 
-    // Create auth user
-    const { data: authData, error: authError } = await supabaseAuth.auth.signUp({
-      email: form.email,
-      password: form.password,
-    });
-
-    if (authError || !authData.user) {
-      setError(authError?.message ?? "Failed to create user.");
+    const { data: sessionData } = await supabaseAuth.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setError("Your admin session has expired. Please sign in again.");
       setIsSubmitting(false);
       return;
     }
 
-    // Create staff profile
-    const { error: profileError } = await supabaseAuth.from("staff_profiles").insert({
-      id: authData.user.id,
-      email: form.email,
-      name: form.name,
-      role: form.role,
-      canteen_id:
-        form.role === "canteen_owner" && form.canteen_id
-          ? Number(form.canteen_id)
-          : null,
-      active: true,
+    const response = await fetch("/api/admin/staff", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        email: form.email,
+        name: form.name,
+        role: form.role,
+        canteen_id: form.role === "canteen_owner" ? form.canteen_id : null,
+      }),
     });
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
 
-    if (profileError) {
-      setError("User created but profile failed: " + profileError.message);
+    if (!response.ok) {
+      setError(result.error ?? "Failed to send invitation.");
       setIsSubmitting(false);
       return;
     }
@@ -193,7 +193,7 @@ export default function StaffManagement() {
       {showForm && (
         <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <h4 className="mb-1 text-sm font-bold text-slate-700">Add Staff Member</h4>
-          <p className="mb-3 text-xs text-slate-500">Create a new staff account. The staff member will use these credentials to log in.</p>
+          <p className="mb-3 text-xs text-slate-500">Send a secure Supabase invitation. The recipient sets their own password when accepting it.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <input
               type="text"
@@ -207,13 +207,6 @@ export default function StaffManagement() {
               placeholder="Email address"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
-            />
-            <input
-              type="password"
-              placeholder="Temporary password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
             />
             <select

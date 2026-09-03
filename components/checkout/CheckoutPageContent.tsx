@@ -13,11 +13,12 @@ import {
   generateOrderNumber,
   groupItemsByCanteen,
 } from "@/lib/cart-utils";
-import {
-  buildWhatsAppUrl,
-  formatWhatsAppOrderMessage,
-} from "@/lib/whatsapp";
 import { saveOrderToSupabase } from "@/lib/supabase";
+import {
+  createTrackingToken,
+  hashTrackingToken,
+  rememberTrackingReference,
+} from "@/lib/order-tracking";
 import type { CheckoutFormData, OrderType } from "@/lib/types";
 
 const initialForm: CheckoutFormData = {
@@ -108,33 +109,44 @@ export default function CheckoutPageContent() {
 
     const orderNumber = generateOrderNumber();
     const order = buildOrder(orderNumber, form, items);
-    const message = formatWhatsAppOrderMessage(order);
-    const whatsappUrl = buildWhatsAppUrl(message);
+    const trackingToken = createTrackingToken();
+    order.trackingToken = trackingToken;
 
-    sessionStorage.setItem("unieats-last-order", JSON.stringify(order));
-
-    // ── Supabase FIRST: order must be saved before anything else ──
+    // ── Supabase FIRST: order must be saved before anything else.
+    // saveOrderToSupabase assigns unique per-canteen order numbers and
+    // updates order.orderNumber with the first generated number.
+    let savedOrder: Awaited<ReturnType<typeof saveOrderToSupabase>>;
     try {
-      await saveOrderToSupabase(order);
+      savedOrder = await saveOrderToSupabase(order, {
+        trackingTokenHash: await hashTrackingToken(trackingToken),
+      });
     } catch (error) {
       const errMsg =
         error instanceof Error ? error.message : "Unknown error";
-      // Detailed technical error stays in the console for development;
-      // the student only sees a friendly message.
       console.error("[UniEats] Supabase order save failed:", errMsg);
-      setOrderError("Unable to place your order. Please try again.");
+      setOrderError("Unable to place your order right now. Please try again.");
       submittedRef.current = false;
       setIsSubmitting(false);
       return;
     }
 
-    // ── Supabase succeeded → WhatsApp + redirect ──
-    try {
-      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-    } catch {
-      // WhatsApp failure is non-critical — order is already in Supabase
-      console.warn("[UniEats] WhatsApp window could not be opened.");
-    }
+    // Save the final order (with per-canteen numbers and database IDs) for the website confirmation page.
+    sessionStorage.setItem("unieats-last-order", JSON.stringify(order));
+    rememberTrackingReference({
+      token: trackingToken,
+      orderIds: savedOrder.orderIds.map(String),
+    });
+
+    // The database trigger creates durable pending notification records. This request
+    // only asks the server to process them; notification failure never blocks checkout.
+    void fetch("/api/notifications/whatsapp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderIds: savedOrder.orderIds.map(String) }),
+      keepalive: true,
+    }).catch((error) => {
+      console.warn("[UniEats] WhatsApp notification dispatch could not start:", error);
+    });
 
     clearCart();
     router.push("/order-success");

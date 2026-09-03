@@ -30,10 +30,10 @@ export function getSscCanteenStatus(date = new Date()): SscCanteenStatus {
 
   return {
     isOpen,
-    label: isOpen ? "🟢 Open Now" : "🔴 Closed Now",
+    label: isOpen ? "Open Now" : "Closed",
     message: isOpen
       ? `Open • ${OPERATING_HOURS}`
-      : `SSC Canteen is currently closed. Operating hours: ${OPERATING_HOURS}.`,
+      : `Currently closed. Operating hours: ${OPERATING_HOURS}.`,
     operatingHours: OPERATING_HOURS,
   };
 }

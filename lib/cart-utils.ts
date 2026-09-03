@@ -77,8 +77,7 @@ export function buildOrder(
 }
 
 export function generateOrderNumber(): string {
-  const digits = String(Math.floor(Math.random() * 900) + 100);
-  return `UE-${digits}`;
+  return String(Math.floor(Math.random() * 900) + 100);
 }
 
 export function formatOrderTime(isoTimestamp: string): string {

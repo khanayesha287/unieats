@@ -7,13 +7,18 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If env vars are missing, let the request through rather than crashing.
-  // Authenticated routes will still be protected by the page-level checks.
+  const pathname = request.nextUrl.pathname;
+  const isProtectedRoute = ["/admin", "/canteen", "/driver"].some(
+    (route) => pathname === route || pathname.startsWith(route + "/"),
+  );
+
   if (!supabaseUrl || !supabaseKey) {
-    console.error(
-      "[UniEats proxy] Missing NEXT_PUBLIC_SUPABASE_URL or anon/publishable key - proxy running in pass-through mode."
-    );
-    return NextResponse.next({ request });
+    console.error("[UniEats proxy] Missing Supabase environment variables.");
+    if (!isProtectedRoute) return NextResponse.next({ request });
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "auth_unavailable");
+    return NextResponse.redirect(url);
   }
 
   let supabaseResponse = NextResponse.next({ request });
@@ -47,8 +52,6 @@ export async function proxy(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
-    const pathname = request.nextUrl.pathname;
     const protectedRoutes: Record<string, string[]> = {
       "/admin": ["admin"],
       "/canteen": ["canteen_owner", "admin"],
@@ -77,7 +80,7 @@ export async function proxy(request: NextRequest) {
     // Fetch staff profile for RBAC
     const { data: profile } = await supabase
       .from("staff_profiles")
-      .select("role, active")
+      .select("role, active, canteen_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -94,12 +97,29 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
+    if (matchedRoute === "/canteen" && profile.role === "canteen_owner") {
+      if (!profile.canteen_id) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/access-denied";
+        url.searchParams.set("reason", "canteen_not_assigned");
+        return NextResponse.redirect(url);
+      }
+      const requestedCanteenId = request.nextUrl.searchParams.get("canteen_id");
+      if (requestedCanteenId !== String(profile.canteen_id)) {
+        const url = request.nextUrl.clone();
+        url.searchParams.set("canteen_id", String(profile.canteen_id));
+        return NextResponse.redirect(url);
+      }
+    }
+
     return supabaseResponse;
   } catch (err) {
-    // Catch-all: log the error and let the request through.
-    // This prevents MIDDLEWARE_INVOCATION_FAILED from crashing the site.
     console.error("[UniEats proxy] Unhandled error:", err);
-    return NextResponse.next({ request });
+    if (!isProtectedRoute) return NextResponse.next({ request });
+    const url = request.nextUrl.clone();
+    url.pathname = "/access-denied";
+    url.searchParams.set("reason", "authentication_check_failed");
+    return NextResponse.redirect(url);
   }
 }
 
