@@ -4,23 +4,32 @@ import Image from "next/image";
 import { useState } from "react";
 import { Plus, Minus, Check } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { useSscCanteenStatus } from "@/lib/canteen-hours";
 import type { MenuItem } from "@/lib/types";
-import { getCanteenName } from "@/lib/data/canteens";
+import { getCanteenName, getCanteenBySlug } from "@/lib/data/canteens";
 import { getMenuImage } from "@/lib/data/menus";
 
 interface FoodCardProps {
   item: MenuItem;
+  /** When true, display a small canteen-name badge on the card. */
+  showCanteenBadge?: boolean;
 }
 
-export default function FoodCard({ item }: FoodCardProps) {
+export default function FoodCard({ item, showCanteenBadge = false }: FoodCardProps) {
   const { addItem } = useCart();
-  const { isOpen } = useSscCanteenStatus();
   const [qty, setQty] = useState(1);
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
+  const canteenData = showCanteenBadge ? getCanteenBySlug(item.canteenSlug) : null;
+
+  // Determine if sizes are pizza-style (S/M/L) or flavour-style
   const hasSizes = item.sizes !== undefined;
+  const isPizzaSizes = hasSizes && item.sizes && Object.keys(item.sizes).some(
+    (k) => k === "Small" || k === "Medium" || k === "Large",
+  );
+  const allSamePrice = hasSizes && item.sizes
+    ? new Set(Object.values(item.sizes)).size === 1
+    : false;
   const [selectedSize, setSelectedSize] = useState<string>(() => {
     if (!item.sizes) return "";
     return "Small" in item.sizes ? "Small" : Object.keys(item.sizes)[0];
@@ -29,7 +38,7 @@ export default function FoodCard({ item }: FoodCardProps) {
   const imageSrc = item.image ?? getMenuImage(item.name);
   const displaySrc = imgError ? "/menu/placeholder.jpg" : imageSrc;
   const currentPrice = hasSizes && selectedSize ? item.sizes![selectedSize] : item.price;
-  const isOrderingDisabled = !item.available || !isOpen;
+  const isOrderingDisabled = !item.available;
   const isDeal = item.id.includes("-deal-");
 
   const handleAdd = () => {
@@ -91,11 +100,15 @@ export default function FoodCard({ item }: FoodCardProps) {
           </p>
         )}
 
-        {/* Sizes — compact pill row */}
+        {/* Sizes / Flavours — compact pill row */}
         {hasSizes && item.sizes && (
           <div className="mt-1 flex flex-wrap gap-1">
             {Object.entries(item.sizes).map(([size, price]) => {
               const active = selectedSize === size;
+              const label = isPizzaSizes
+                ? (size === "Small" ? 'S (7")' : size === "Medium" ? 'M (10")' : size === "Large" ? 'L (13")' : size)
+                : size;
+              const priceLabel = allSamePrice ? "" : ` \u00B7 Rs.${price}`;
               return (
                 <button
                   key={size}
@@ -108,11 +121,20 @@ export default function FoodCard({ item }: FoodCardProps) {
                       : "border-gray-200 bg-white text-gray-600 hover:border-[#6C2BD9]/40")
                   }
                 >
-                  {size === "Small" ? 'S (7")' : size === "Medium" ? 'M (10")' : size === "Large" ? 'L (13")' : size} · Rs.{price}
+                  {label}{priceLabel}
                 </button>
               );
             })}
           </div>
+        )}
+
+        {/* Canteen badge */}
+        {showCanteenBadge && canteenData && (
+          <span
+            className={`mt-0.5 inline-flex w-fit items-center rounded-full bg-gradient-to-r ${canteenData.gradient} px-2 py-0.5 text-[10px] font-bold text-white shadow-sm`}
+          >
+            {canteenData.name}
+          </span>
         )}
 
         {/* Price */}
@@ -125,7 +147,7 @@ export default function FoodCard({ item }: FoodCardProps) {
       <div className="flex shrink-0 flex-col items-end justify-between self-stretch">
         {isOrderingDisabled ? (
           <span className="mt-1 rounded-full border border-gray-200 px-2.5 py-1 text-[11px] font-semibold text-gray-400">
-            {isOpen ? "N/A" : "Closed"}
+            N/A
           </span>
         ) : !expanded ? (
           <button

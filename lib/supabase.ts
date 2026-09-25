@@ -1,5 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import type { Order } from "@/lib/types";
+import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey =
@@ -30,9 +31,9 @@ interface PostgrestErrorShape {
  * hint) so the exact failure cause is visible during development.
  * Never logs credentials, keys, or auth tokens — only the error object.
  */
-function logOrderError(context: string, error: PostgrestErrorShape | null): void {
+function logOrderError(label: string, error: PostgrestErrorShape | null): void {
   if (!error) return;
-  console.error(`[UniEats] ORDER ERROR — ${context}:`, {
+  console.error(`[UniEats] ${label}:`, {
     message: error?.message,
     code: error?.code,
     details: error?.details,
@@ -85,7 +86,7 @@ function normalizeMenuItemId(value: unknown): string | number | null {
 
 /**
  * Normalizes a canteen name or slug for matching: "SSC Canteen" → "ssc",
- * "Tippu Center" → "tippucenter".
+ * "Hot Potato" → "hotpotato".
  */
 function normalizeCanteenKey(value: string): string {
   return value
@@ -107,7 +108,7 @@ async function resolveCanteenId(
   const { data, error } = await supabase.from("canteens").select("id, name");
 
   if (error) {
-    logOrderError("canteen lookup for order save", error);
+    logOrderError("Canteen lookup for order save failed", error);
     return null;
   }
 
@@ -131,154 +132,337 @@ async function resolveCanteenId(
     return (key !== "" && key === slugKey) || (key !== "" && key === nameKey);
   });
 
-  return normalized?.id !== undefined && normalized?.id !== null
-    ? (normalized.id as string | number)
-    : null;
+  if (normalized?.id !== undefined && normalized?.id !== null) {
+    return normalized.id as string | number;
+  }
+
+  // Last-resort substring match: handles cases where DB stores e.g.
+  // "Bhola" and the frontend sends canteenName "Bhola Canteen" but
+  // normalization strips differently.  Avoids false positives like
+  // "SSC" matching "GSSC" by requiring the shorter key to be at least
+  // 60 % of the longer key's length.
+  const fallback = rows.find((row) => {
+    if (typeof row.name !== "string") return false;
+    const key = normalizeCanteenKey(row.name);
+    if (!key || (!slugKey && !nameKey)) return false;
+    for (const candidate of [slugKey, nameKey]) {
+      if (!candidate) continue;
+      const shorter = key.length < candidate.length ? key : candidate;
+      const longer = key.length < candidate.length ? candidate : key;
+      if (longer.includes(shorter) && shorter.length / longer.length >= 0.6) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  if (fallback?.id !== undefined && fallback?.id !== null) {
+    return fallback.id as string | number;
+  }
+
+  // Without a canteen reference the order is invisible to its canteen portal
+  // (which filters by canteen_id), so no staff member can confirm/prepare it
+  // and the student's tracking box stays pending forever. Surface the cause
+  // loudly instead of failing silently.
+  console.warn(
+    `[UniEats] Canteen "${canteenName}" (slug: "${canteenSlug}") was not found in the database canteens table. ` +
+      "The order is saved without a canteen reference, so its portal cannot receive or update it and student tracking stays pending. " +
+      "Add this canteen to the Supabase canteens table to enable its portal and order tracking.",
+  );
+  return null;
 }
 
-async function resolveDriverId(): Promise<string | number | null> {
+
+export interface SaveOrderOptions {
+  /**
+   * Initial status for the order. Defaults to "pending".
+   */
+  status?: string;
+  /** SHA-256 hash of the guest tracking token; raw tokens never enter the database. */
+  trackingTokenHash?: string;
+}
+
+/**
+ * Generates `count` unique 3-digit order numbers (100–999) that do not
+ * collide with existing rows in the `orders` table.
+ *
+ * Strategy:
+ *  1. Fetch all existing order_numbers in one query.
+ *  2. Build a Set for O(1) lookup.
+ *  3. Generate random candidates, skipping taken ones.
+ *  4. Retry up to 5 rounds if the candidate space gets tight.
+ *
+ * Throws if the space is exhausted (extremely unlikely for < 900 orders
+ * in the active window, but the function handles it safely).
+ */
+export async function generateUniqueOrderNumbers(
+  count: number,
+): Promise<string[]> {
   if (!supabase) {
-    return null;
+    throw new Error("Supabase is not configured.");
   }
 
-  const { data, error } = await supabase
-    .from("driver")
-    .select("id")
-    .limit(1)
-    .maybeSingle();
+  const MAX_RETRIES = 5;
+  const generated: string[] = [];
 
-  if (error) {
-    console.warn(
-      "[UniEats] Unable to find an active driver record for delivery order:",
-      {
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-      },
+  // Fetch existing order_numbers in a single query
+  const { data: existingRows } = await supabase
+    .from("orders")
+    .select("order_number");
+
+  const taken = new Set<string>();
+  if (Array.isArray(existingRows)) {
+    for (const row of existingRows) {
+      const val = (row as Record<string, unknown>).order_number;
+      if (typeof val === "string") taken.add(val);
+    }
+  }
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    let safetyCounter = 0;
+    while (generated.length < count && safetyCounter < 5000) {
+      safetyCounter++;
+      const candidate = String(Math.floor(Math.random() * 900) + 100);
+      if (!taken.has(candidate)) {
+        generated.push(candidate);
+        taken.add(candidate); // prevent self-collision within this batch
+      }
+    }
+    if (generated.length >= count) break;
+  }
+
+  if (generated.length < count) {
+    throw new Error(
+      `Unable to generate ${count} unique order numbers — available number space is nearly exhausted. Please contact support.`,
     );
-    return null;
   }
 
-  return data?.id ?? null;
+  return generated;
 }
 
+/**
+ * Saves a multi-canteen order to Supabase.
+ *
+ * Creates one `orders` row per canteen group, each with its own canteen_id,
+ * subtotal, delivery charge, and associated `order_items` rows.
+ *
+ * If any group fails after earlier groups succeeded, the already-created
+ * orders are rolled back (deleted) to avoid a partial state.
+ */
 export async function saveOrderToSupabase(
   order: Order,
-): Promise<{ orderId: string | number }> {
+  options: SaveOrderOptions = {},
+): Promise<{ orderId: string | number; orderIds: (string | number)[] }> {
   if (!supabase) {
     throw new Error("Supabase is not configured. Cannot save order.");
   }
 
-  const canteenId =
-    order.canteenOrders.length > 0
-      ? await resolveCanteenId(
-          order.canteenOrders[0].canteenSlug,
-          order.canteenOrders[0].canteenName,
-        )
-      : null;
+  const initialStatus = options.status ?? "pending";
+  const createdOrderIds: (string | number)[] = [];
 
-  const driverId =
-    order.orderType === "delivery" ? await resolveDriverId() : null;
+  // Driver assignment is handled post-checkout by admin.
+  // Do NOT insert driver_id at order creation time — doing so caused
+  // FK / missing-table failures that rolled back multi-canteen checkouts.
 
-  // Build order record — include department if the column exists
-  const orderRecord: Record<string, unknown> = {
-    order_number: order.orderNumber,
-    student_name: order.studentName,
-    phone: order.phone,
-    department: order.department ?? null,
-    delivery_location:
-      order.orderType === "delivery" ? order.deliveryLocation ?? null : null,
-    order_type: order.orderType,
-    canteen_id: canteenId,
-    status: "pending",
-    total_amount: Number(order.grandTotal),
-    delivery_charge: Number(order.deliveryFee),
-    discount: Number(order.deliveryFee > 0 ? 25 : 0),
-    driver_id: driverId,
-    payment_method: order.paymentMethod ?? null,
-    special_instructions: order.specialInstructions ?? null,
-  };
-
-  let insertedOrder: { id: string | number } | null = null;
-  let orderError: PostgrestErrorShape | null = null;
-
-  // Insert with all columns. If the orders table is missing an optional
-  // column (e.g. payment_method before its migration has been run), drop
-  // that column and retry so the order still saves instead of failing.
-  const attemptRecord: Record<string, unknown> = { ...orderRecord };
-  const droppedColumns: string[] = [];
-
-  for (;;) {
-    const result = await supabase
-      .from("orders")
-      .insert([attemptRecord])
-      .select("id")
-      .single();
-
-    if (!result.error) {
-      insertedOrder = result.data as { id: string | number } | null;
-      orderError = null;
-      break;
-    }
-
-    const missingColumn = findMissingColumn(result.error);
-    if (!missingColumn || !(missingColumn in attemptRecord)) {
-      orderError = result.error;
-      logOrderError("orders insert", result.error);
-      console.error("[UniEats] Order payload that failed to save:", attemptRecord);
-      break;
-    }
-
-    droppedColumns.push(missingColumn);
-    delete attemptRecord[missingColumn];
-  }
-
-  if (droppedColumns.length > 0) {
-    console.warn(
-      `[UniEats] The orders table is missing column(s): ${droppedColumns.join(", ")}. ` +
-        "The order was saved without them. Run supabase-migrations/" +
-        "add-payment-method-column.sql in the Supabase SQL editor to persist them.",
-    );
-  }
-
-  if (orderError) {
-    throw new Error(
-      `Failed to create order in database: ${orderError.message ?? "Unknown error"}`,
-    );
-  }
-
-  const orderId = insertedOrder?.id;
-  if (orderId === undefined || orderId === null) {
-    throw new Error("Order insert succeeded but no order id was returned.");
-  }
-
-  const itemsToInsert = order.canteenOrders.flatMap((group) =>
-    group.items.map((item) => ({
-      order_id: orderId,
-      menu_item_id: normalizeMenuItemId(item.id),
-      item_name: item.name,
-      quantity: item.quantity,
-      price: Number(item.price),
-      subtotal: Number(item.price * item.quantity),
-    })),
+  // Generate one unique 3-digit order number per canteen group.
+  // Each DB order record MUST have its own unique order_number
+  // (the column has a UNIQUE constraint).
+  const uniqueOrderNumbers = await generateUniqueOrderNumbers(
+    order.canteenOrders.length,
   );
 
-  if (itemsToInsert.length > 0) {
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(itemsToInsert);
+  // Use the first generated number as the customer-facing checkout reference
+  // shown on the website confirmation page.
+  order.orderNumber = uniqueOrderNumbers[0];
 
-    if (itemsError) {
-      logOrderError("order_items insert", itemsError);
-      console.error("[UniEats] Order items payload that failed to save:", itemsToInsert);
-      throw new Error(
-        `Order was created but items failed to save: ${itemsError.message ?? "Unknown error"}`,
+  // Delivery charge per canteen order (Rs. 25 per canteen for delivery, 0 for pickup)
+  const perCanteenDelivery =
+    order.orderType === "delivery" ? DELIVERY_FEE_PER_CANTEEN : 0;
+
+  try {
+    for (let i = 0; i < order.canteenOrders.length; i++) {
+      const group = order.canteenOrders[i];
+      // Assign unique order number to this canteen group
+      const groupOrderNumber = uniqueOrderNumbers[i];
+      group.orderNumber = groupOrderNumber;
+      // Resolve canteen_id for THIS group
+      const canteenId = await resolveCanteenId(
+        group.canteenSlug,
+        group.canteenName,
       );
+
+      // Build order record for this canteen group
+      const orderRecord: Record<string, unknown> = {
+        order_number: groupOrderNumber,
+        student_name: order.studentName,
+        registration_number: order.registrationNumber?.trim() || null,
+        phone: order.phone,
+        department: order.department ?? null,
+        delivery_location:
+          order.orderType === "delivery"
+            ? order.deliveryLocation ?? null
+            : null,
+        order_type: order.orderType,
+        canteen_id: canteenId,
+        status: initialStatus,
+        total_amount: Number(group.subtotal + perCanteenDelivery),
+        delivery_charge: Number(perCanteenDelivery),
+        discount: Number(perCanteenDelivery > 0 ? 25 : 0),
+        payment_method: order.paymentMethod ?? null,
+        special_instructions: order.specialInstructions ?? null,
+        tracking_token_hash: options.trackingTokenHash ?? null,
+      };
+
+      // Insert with column-dropping fallback for missing optional columns
+      let insertedOrder: { id: string | number } | null = null;
+      let orderError: PostgrestErrorShape | null = null;
+      const attemptRecord: Record<string, unknown> = { ...orderRecord };
+      const droppedColumns: string[] = [];
+
+      for (;;) {
+        const result = await supabase
+          .from("orders")
+          .insert([attemptRecord])
+          .select("id")
+          .single();
+
+        if (!result.error) {
+          insertedOrder = result.data as { id: string | number } | null;
+          orderError = null;
+          break;
+        }
+
+        const missingColumn = findMissingColumn(result.error);
+        if (!missingColumn || !(missingColumn in attemptRecord)) {
+          orderError = result.error;
+          logOrderError("Order insert failed", result.error);
+          console.error(
+            "[UniEats] Order payload that failed to save:",
+            attemptRecord,
+          );
+          break;
+        }
+
+        droppedColumns.push(missingColumn);
+        delete attemptRecord[missingColumn];
+      }
+
+      if (droppedColumns.length > 0) {
+        console.warn(
+          `[UniEats] The orders table is missing column(s): ${droppedColumns.join(", ")}. ` +
+            "The order was saved without them. Run supabase-migrations/ " +
+            "add-payment-method.sql in the Supabase SQL editor to persist them.",
+        );
+      }
+
+      if (orderError) {
+        throw new Error(
+          `Failed to create order for ${group.canteenName}: ${orderError.message ?? "Unknown error"}`,
+        );
+      }
+
+      const orderId = insertedOrder?.id;
+      if (orderId === undefined || orderId === null) {
+        throw new Error("Order insert succeeded but no order id was returned.");
+      }
+
+      createdOrderIds.push(orderId);
+      group.orderId = orderId;
+
+      // Insert order_items for THIS canteen group only
+      const itemsToInsert = group.items.map((item) => ({
+        order_id: orderId,
+        menu_item_id: normalizeMenuItemId(item.id),
+        item_name: item.name,
+        quantity: item.quantity,
+        price: Number(item.price),
+        subtotal: Number(item.price * item.quantity),
+      }));
+
+      if (itemsToInsert.length > 0) {
+        const { error: itemsError } = await supabase
+          .from("order_items")
+          .insert(itemsToInsert);
+
+        if (itemsError) {
+          logOrderError("Order items insert failed", itemsError);
+          console.error(
+            "[UniEats] Order items payload that failed to save:",
+            itemsToInsert,
+          );
+          throw new Error(
+            `Order for ${group.canteenName} was created but items failed to save: ${itemsError.message ?? "Unknown error"}`,
+          );
+        }
+      }
     }
+  } catch (error) {
+    // Rollback: delete any orders that were already created
+    if (createdOrderIds.length > 0) {
+      console.warn(
+        `[UniEats] Rolling back ${createdOrderIds.length} order(s) due to failure in multi-canteen checkout.`,
+      );
+      for (const rollbackId of createdOrderIds) {
+        try {
+          await supabase
+            .from("order_items")
+            .delete()
+            .eq("order_id", rollbackId);
+          await supabase.from("orders").delete().eq("id", rollbackId);
+        } catch (rollbackError) {
+          console.error(
+            `[UniEats] Failed to roll back order ${rollbackId}:`,
+            rollbackError,
+          );
+        }
+      }
+    }
+    throw error;
   }
 
-  return { orderId };
+  return { orderId: createdOrderIds[0], orderIds: createdOrderIds };
+}
+
+// ---------------------------------------------------------------------------
+// Delete order (admin-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Deletes an order and its associated order_items from Supabase.
+ * Should only be called for admin-authorized delete operations.
+ */
+export async function deleteOrderFromSupabase(
+  orderId: string | number,
+): Promise<void> {
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Cannot delete order.");
+  }
+
+  // Delete order_items first (child rows)
+  const { error: itemsError } = await supabase
+    .from("order_items")
+    .delete()
+    .eq("order_id", orderId);
+
+  if (itemsError) {
+    console.error("[UniEats] Failed to delete order items:", itemsError);
+    throw new Error(
+      `Failed to delete order items: ${itemsError.message ?? "Unknown error"}`,
+    );
+  }
+
+  // Delete the order itself
+  const { error: orderError } = await supabase
+    .from("orders")
+    .delete()
+    .eq("id", orderId);
+
+  if (orderError) {
+    console.error("[UniEats] Failed to delete order:", orderError);
+    throw new Error(
+      `Failed to delete order: ${orderError.message ?? "Unknown error"}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

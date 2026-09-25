@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { User } from "@supabase/supabase-js";
+import type { Session, User } from "@supabase/supabase-js";
 import type { StaffProfile } from "@/lib/auth";
 import { supabaseAuth } from "@/lib/supabase-auth";
 
@@ -74,72 +74,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Hydrate from cache first for instant UI
-    if (typeof window !== "undefined") {
+    let isMounted = true;
+
+    const clearCachedProfile = () => {
+      if (typeof window === "undefined") return;
       try {
-        const cached = window.localStorage.getItem(PROFILE_CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached) as StaffProfile;
-          if (parsed && parsed.id) setProfile(parsed);
-        }
+        window.localStorage.removeItem(PROFILE_CACHE_KEY);
       } catch {
         /* ignore */
       }
-    }
+    };
 
-    // Get current session
-    supabaseAuth.auth
-      .getSession()
-      .then(({ data: { session } }) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchUserProfile(session.user.id).then((p) => {
-            setProfile(p);
-            if (p && typeof window !== "undefined") {
-              try {
-                window.localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
-              } catch {
-                /* ignore */
-              }
-            }
-            setLoading(false);
-          });
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      })
-      .catch(() => setLoading(false));
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabaseAuth.auth.onAuthStateChange((_event, session) => {
+    const applySession = async (session: Session | null, initial = false) => {
+      if (!isMounted) return;
       setUser(session?.user ?? null);
       if (!session?.user) {
         setProfile(null);
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.removeItem(PROFILE_CACHE_KEY);
-          } catch {
-            /* ignore */
-          }
-        }
-      } else {
-        fetchUserProfile(session.user.id).then((p) => {
-          setProfile(p);
-          if (p && typeof window !== "undefined") {
-            try {
-              window.localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
-            } catch {
-              /* ignore */
-            }
-          }
-        });
+        clearCachedProfile();
+        if (initial) setLoading(false);
+        return;
       }
+
+      const nextProfile = await fetchUserProfile(session.user.id);
+      if (!isMounted) return;
+      setProfile(nextProfile);
+      if (nextProfile && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(nextProfile));
+        } catch {
+          /* ignore */
+        }
+      }
+      if (initial) setLoading(false);
+    };
+
+    supabaseAuth.auth
+      .getSession()
+      .then(({ data: { session } }) => applySession(session, true))
+      .catch(() => {
+        if (isMounted) {
+          setUser(null);
+          setProfile(null);
+          clearCachedProfile();
+          setLoading(false);
+        }
+      });
+
+    const {
+      data: { subscription },
+    } = supabaseAuth.auth.onAuthStateChange((_event, session) => {
+      void applySession(session);
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);

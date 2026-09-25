@@ -1,7 +1,9 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase, buildStatusUpdatePayload } from "@/lib/supabase";
+import { buildStatusUpdatePayload } from "@/lib/supabase";
+import { supabaseAuth } from "@/lib/supabase-auth";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 type DriverStatus = "ready" | "out_for_delivery" | "delivered";
 
@@ -24,6 +26,7 @@ interface DriverOrder {
   order_number: string;
   student_name: string;
   phone: string;
+  department?: string | null;
   order_type: "pickup" | "delivery";
   delivery_location: string | null;
   canteen_id: number | string | null;
@@ -32,20 +35,31 @@ interface DriverOrder {
   delivery_charge: number;
   payment_method?: string | null;
   created_at: string | null;
+  driver_id?: string | number | null;
 }
 
 const DRIVER_STATUSES: DriverStatus[] = ["ready", "out_for_delivery", "delivered"];
 
 const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  confirmed: "bg-blue-100 text-blue-800",
+  preparing: "bg-orange-100 text-orange-800",
   ready: "bg-emerald-100 text-emerald-800",
   out_for_delivery: "bg-cyan-100 text-cyan-800",
   delivered: "bg-green-100 text-green-800",
+  completed: "bg-slate-100 text-slate-800",
+  cancelled: "bg-red-100 text-red-800",
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  preparing: "Preparing",
   ready: "Ready for Pickup",
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 function pickString(
@@ -96,10 +110,8 @@ function toShortTime(value?: string | null): string {
 }
 
 function normalizeDriverStatus(value: unknown): string {
-  const normalized = typeof value === "string" ? value : "ready";
-  return DRIVER_STATUSES.includes(normalized as DriverStatus)
-    ? normalized
-    : "ready";
+  if (typeof value === "string" && value.trim()) return value;
+  return "pending";
 }
 
 function coerceCanteen(input: unknown): CanteenRecord | null {
@@ -142,6 +154,7 @@ function coerceOrder(input: unknown): DriverOrder | null {
     student_name:
       pickString(record, ["student_name", "studentName", "name"]) ?? "Unknown",
     phone: pickString(record, ["phone", "mobile"]) ?? "\u2014",
+    department: pickString(record, ["department"]) ?? null,
     order_type: "delivery",
     delivery_location:
       pickString(record, ["delivery_location", "deliveryLocation"]) ?? null,
@@ -188,6 +201,7 @@ function coerceOrderItem(input: unknown): DriverOrderItem | null {
 }
 
 export default function DriverPortalContent() {
+  const { profile } = useAuth();
   const [orders, setOrders] = useState<DriverOrder[]>([]);
   const [items, setItems] = useState<DriverOrderItem[]>([]);
   const [canteens, setCanteens] = useState<CanteenRecord[]>([]);
@@ -197,17 +211,28 @@ export default function DriverPortalContent() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const loadData = useCallback(async () => {
-    if (!supabase) {
+  const loadData = useCallback(async (silent = false) => {
+    if (!supabaseAuth) {
       setError("Supabase is not configured.");
       setIsLoading(false);
       return;
     }
 
+    if (profile?.role === "driver" && !profile.id) {
+      setError("Driver profile is not available.");
+      setIsLoading(false);
+      return;
+    }
+
+    let ordersQuery = supabaseAuth.from("orders").select("*").eq("order_type", "delivery");
+    if (profile?.role === "driver") {
+      ordersQuery = ordersQuery.eq("driver_id", profile.id);
+    }
+
     const [ordersResult, canteensResult, itemsResult] = await Promise.all([
-      supabase.from("orders").select("*").eq("order_type", "delivery"),
-      supabase.from("canteens").select("*"),
-      supabase.from("order_items").select("*"),
+      ordersQuery,
+      supabaseAuth.from("canteens").select("*"),
+      supabaseAuth.from("order_items").select("*"),
     ]);
 
     if (ordersResult.error && !isMissingTableError(ordersResult.error)) {
@@ -226,7 +251,11 @@ export default function DriverPortalContent() {
     const newOrders = (Array.isArray(ordersResult.data) ? ordersResult.data : [])
       .map(coerceOrder)
       .filter((r): r is DriverOrder => r !== null)
-      .filter((o) => DRIVER_STATUSES.includes(o.status as DriverStatus))
+      .filter((o) => {
+        // Only show orders that have reached "ready" stage or later
+        const preDriverStatuses = ["pending", "confirmed", "preparing", "cancelled"];
+        return !preDriverStatuses.includes(o.status);
+      })
       .sort((a, b) => {
         const at = a.created_at ? new Date(a.created_at).getTime() : 0;
         const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -245,37 +274,50 @@ export default function DriverPortalContent() {
     setOrders(newOrders);
     setItems(newItems);
     setError(hasRealError ? "Some queries failed. Check console." : null);
-    setIsLoading(false);
-  }, []);
+    if (!silent) setIsLoading(false);
+  }, [profile]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  // Polling every 15 s — silent refresh (no loading flash)
   useEffect(() => {
-    if (!supabase) return;
+    const interval = setInterval(() => {
+      void loadData(true);
+    }, 15_000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
-    const channel = supabase
+  useEffect(() => {
+    if (!supabaseAuth) return;
+
+    const channel = supabaseAuth
       .channel("driver-orders-realtime")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
-        () => { void loadData(); },
+        () => { void loadData(true); },
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
-        () => { void loadData(); },
+        () => { void loadData(true); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "orders" },
+        () => { void loadData(true); },
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "order_items" },
-        () => { void loadData(); },
+        () => { void loadData(true); },
       )
       .subscribe();
 
     return () => {
-      if (supabase) void supabase.removeChannel(channel);
+      if (supabaseAuth) void supabaseAuth.removeChannel(channel);
     };
   }, [loadData]);
 
@@ -309,12 +351,12 @@ export default function DriverPortalContent() {
   );
 
   const updateStatus = async (orderId: number | string, nextStatus: string) => {
-    if (!supabase) return;
+    if (!supabaseAuth) return;
 
     // Build payload with timestamp; fall back to status-only if columns don't exist
     let payload: Record<string, unknown> = { status: nextStatus };
     try {
-      const { data: existing } = await supabase
+      const { data: existing } = await supabaseAuth
         .from("orders")
         .select("ready_at,out_for_delivery_at,delivered_at")
         .eq("id", orderId)
@@ -323,17 +365,25 @@ export default function DriverPortalContent() {
     } catch { /* columns may not exist yet */ }
 
     setIsUpdating(true);
-    let { error: updateError } = await supabase
+    let updateQuery = supabaseAuth
       .from("orders")
       .update(payload)
       .eq("id", orderId);
+    if (profile?.role === "driver") {
+      updateQuery = updateQuery.eq("driver_id", profile.id);
+    }
+    let { error: updateError } = await updateQuery;
 
     // If update failed (e.g. missing timestamp columns), retry with status-only
     if (updateError && Object.keys(payload).length > 1) {
-      const { error: retryError } = await supabase
+      let retryQuery = supabaseAuth
         .from("orders")
         .update({ status: nextStatus })
         .eq("id", orderId);
+      if (profile?.role === "driver") {
+        retryQuery = retryQuery.eq("driver_id", profile.id);
+      }
+      const { error: retryError } = await retryQuery;
       updateError = retryError;
     }
 
@@ -421,15 +471,6 @@ export default function DriverPortalContent() {
               Deliveries
             </h1>
             <div className="flex items-center gap-2">
-              {process.env.NODE_ENV !== "production" && (
-                <button
-                  type="button"
-                  onClick={() => void insertTestDelivery()}
-                  className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-200"
-                >
-                  + Test Delivery
-                </button>
-              )}
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white">
                 {activeOrders.length}
               </span>
@@ -532,6 +573,14 @@ export default function DriverPortalContent() {
                               <p className="mt-1 text-sm font-medium text-slate-800">
                                 {order.student_name}
                               </p>
+<<<<<<< HEAD
+=======
+                              {order.department && (
+                                <p className="text-xs text-slate-500">
+                                  {order.department}
+                                </p>
+                              )}
+>>>>>>> origin/main
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-bold text-slate-900">
@@ -582,6 +631,14 @@ export default function DriverPortalContent() {
                                   >
                                     {order.phone}
                                   </a>
+<<<<<<< HEAD
+=======
+                                  {order.department && (
+                                    <p className="text-xs text-slate-500">
+                                      {order.department}
+                                    </p>
+                                  )}
+>>>>>>> origin/main
                                 </div>
                               </div>
 

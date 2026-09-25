@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import SscCanteenStatus from "@/components/ui/SscCanteenStatus";
-import { useSscCanteenStatus } from "@/lib/canteen-hours";
 
 const features = [
   "🚀 Fast Ordering",
@@ -12,8 +11,6 @@ const features = [
 ];
 
 export default function CTA() {
-  const { isOpen } = useSscCanteenStatus();
-
   return (
     <section className="px-4 py-20 sm:px-6 lg:px-8 lg:py-28" aria-labelledby="cta-heading">
       <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#6C2BD9] via-[#7C3AED] to-[#5B21B6] px-6 py-16 text-center text-white shadow-2xl shadow-[#6C2BD9]/30 sm:px-12 sm:py-20">
@@ -34,7 +31,7 @@ export default function CTA() {
           </h2>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/85">
-            Browse the SSC menu, place your order in seconds, and choose Pickup
+            Browse campus canteen menus, place your order in seconds, and choose Pickup
             or Campus Delivery.
           </p>
 
@@ -43,7 +40,8 @@ export default function CTA() {
           </div>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            {isOpen ? (
+<<<<<<< HEAD
+                        {isOpen ? (
               <Link
                 href="/canteens"
                 className="w-full rounded-full bg-white px-8 py-4 text-sm font-semibold text-[#6C2BD9] shadow-lg transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-[#F4C542] hover:text-[#2E1065] sm:w-auto"
@@ -55,6 +53,7 @@ export default function CTA() {
                 Order Now
               </span>
             )}
+>>>>>>> origin/main
           </div>
 
           <div className="mt-12 flex flex-wrap items-center justify-center gap-3">

@@ -2,60 +2,232 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Clock, Home, UtensilsCrossed, X } from "lucide-react";
+import { CheckCircle2, Clock, Home, MapPin, UtensilsCrossed } from "lucide-react";
 import { formatPrice } from "@/lib/format";
 import { formatOrderTime } from "@/lib/cart-utils";
+import OrderTracking from "@/components/ui/OrderTracking";
+import { TRACKING_STATUSES, type TrackedOrder, type TrackingStatus } from "@/lib/order-tracking";
 import type { Order } from "@/lib/types";
-import { buildWhatsAppReviewMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
+
+function createInitialTrackingOrders(savedOrder: Order): TrackedOrder[] {
+  return savedOrder.canteenOrders.map((group, index) => ({
+    id: String(group.orderId ?? `${savedOrder.orderNumber}-${group.canteenSlug}-${index}`),
+    orderNumber: group.orderNumber ?? savedOrder.orderNumber,
+    studentName: savedOrder.studentName,
+    orderType: savedOrder.orderType,
+    deliveryLocation: savedOrder.deliveryLocation ?? null,
+    canteenName: group.canteenName,
+    // Checkout creates every order as pending. This initial view is replaced
+    // by the verified Supabase status as soon as the tracking request returns.
+    status: "pending",
+    totalAmount: group.subtotal,
+    deliveryCharge: 0,
+    createdAt: savedOrder.timestamp,
+    items: group.items.map((item) => ({
+      id: item.id,
+      itemName: item.name,
+      quantity: item.quantity,
+      price: Number(item.price),
+      subtotal: Number(item.price * item.quantity),
+    })),
+  }));
+}
 
 export default function OrderSuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [trackedOrders, setTrackedOrders] = useState<TrackedOrder[]>([]);
 
   useEffect(() => {
-    const handle = requestAnimationFrame(() => {
-      try {
-        const stored = sessionStorage.getItem("unieats-last-order");
-        if (stored) {
-          setOrder(JSON.parse(stored) as Order);
-        }
-      } catch {
-        setOrder(null);
+    let mounted = true;
+    try {
+      const stored = sessionStorage.getItem("unieats-last-order");
+      if (!stored) return;
+      const saved = JSON.parse(stored) as Order;
+      const initialLoad = window.setTimeout(() => setOrder(saved), 0);
+      const token = saved.trackingToken;
+      const orderIds = saved.canteenOrders
+        .map((group) => group.orderId)
+        .filter((id): id is string | number => id !== undefined && id !== null)
+        .map(String);
+      if (!token || orderIds.length === 0) {
+        return () => {
+          mounted = false;
+          window.clearTimeout(initialLoad);
+        };
       }
-    });
-    return () => cancelAnimationFrame(handle);
-  }, []);
 
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => {
-      setIsModalOpen(true);
-    });
-    return () => cancelAnimationFrame(handle);
-  }, []);
+      // Real-time status patches pushed by /api/orders/track/stream (Supabase
+      // Realtime relayed server-side, since guest browsers have no RLS read
+      // access). Patches apply the moment canteen/driver staff act; the
+      // polling loop below stays as a reconciling fallback.
+      const statusPatches = new Map<string, TrackingStatus>();
+      const applyPatches = (list: TrackedOrder[]) =>
+        statusPatches.size === 0
+          ? list
+          : list.map((tracked) => {
+              const patched = statusPatches.get(tracked.id);
+              return patched && patched !== tracked.status
+                ? { ...tracked, status: patched }
+                : tracked;
+            });
 
-  const orderNumber = order?.orderNumber ?? "UE-PENDING-001";
-  const prepTime = "15–20 min";
+      // Merge fresh server results into the tracked list by id. A degraded or
+      // partial response (e.g. one per-canteen order deleted by an admin)
+      // must never erase the last-known status of the remaining boxes.
+      const mergeTracked = (fresh: TrackedOrder[]) => {
+        setTrackedOrders((previous) => {
+          if (previous.length === 0) return applyPatches(fresh);
+          const freshIds = new Set(fresh.map((order) => order.id));
+          return [
+            ...applyPatches(fresh),
+            ...previous.filter((order) => !freshIds.has(order.id)),
+          ];
+        });
+      };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+      const load = async () => {
+        try {
+          const response = await fetch("/api/orders/track", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token, orderIds }),
+            cache: "no-store",
+          });
+          if (!response.ok || !mounted) return;
+          const payload = (await response.json()) as { orders?: TrackedOrder[] };
+          if (mounted && Array.isArray(payload.orders)) mergeTracked(payload.orders);
+        } catch {
+          // Transient network failures keep the last-known statuses.
+        }
+      };
 
-    const trimmedMessage = message.trim();
-    if (!trimmedMessage) {
-      return;
+      const refreshWhenVisible = () => {
+        if (mounted && document.visibilityState === "visible") void load();
+      };
+
+      void load();
+      const interval = window.setInterval(load, 5_000);
+      // Refresh immediately when the student returns to the tab or comes
+      // back online so statuses feel live instead of waiting for the next tick.
+      document.addEventListener("visibilitychange", refreshWhenVisible);
+      window.addEventListener("online", refreshWhenVisible);
+
+      // Real-time stream: when canteen or driver staff change an order status,
+      // the server broadcasts the change to this student's stream and local
+      // state updates instantly — no browser refresh, no polling delay.
+      // Reconnects automatically with exponential backoff.
+      const streamController = new AbortController();
+      let reconnectTimer: number | undefined;
+      let retryDelayMs = 1_000;
+
+      const handleStreamFrame = (frame: string) => {
+        const dataLine = frame
+          .split("\n")
+          .find((line) => line.startsWith("data: "));
+        if (!dataLine) return;
+        try {
+          const event = JSON.parse(dataLine.slice("data: ".length)) as {
+            type?: string;
+            id?: unknown;
+            status?: unknown;
+            orders?: Array<{ id?: unknown; status?: unknown }>;
+          };
+          if (event.type === "ready" && Array.isArray(event.orders)) {
+            // Seed frame: apply current server statuses instantly so the
+            // boxes never render a stale state while the first poll runs.
+            for (const seeded of event.orders) {
+              if (
+                seeded?.id !== undefined &&
+                typeof seeded.status === "string" &&
+                TRACKING_STATUSES.includes(seeded.status as TrackingStatus)
+              ) {
+                statusPatches.set(String(seeded.id), seeded.status as TrackingStatus);
+              }
+            }
+            setTrackedOrders((previous) =>
+              previous.length > 0 ? applyPatches(previous) : previous,
+            );
+            return;
+          }
+          if (
+            event.type === "status" &&
+            event.id !== undefined &&
+            typeof event.status === "string" &&
+            TRACKING_STATUSES.includes(event.status as TrackingStatus)
+          ) {
+            const id = String(event.id);
+            statusPatches.set(id, event.status as TrackingStatus);
+            setTrackedOrders((previous) =>
+              previous.length > 0 ? applyPatches(previous) : previous,
+            );
+          }
+          // "deleted" events intentionally keep the last-known box, matching
+          // the merge behavior of the polling fallback.
+        } catch {
+          // Malformed frame: skip it; subsequent frames still apply.
+        }
+      };
+
+      const connectStream = async () => {
+        while (mounted && !streamController.signal.aborted) {
+          try {
+            const response = await fetch("/api/orders/track/stream", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token, orderIds }),
+              cache: "no-store",
+              signal: streamController.signal,
+            });
+            if (!response.ok || !response.body) {
+              throw new Error(`stream ${response.status}`);
+            }
+            retryDelayMs = 1_000;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done || !mounted) break;
+              buffer += decoder.decode(value, { stream: true });
+              const frames = buffer.split("\n\n");
+              buffer = frames.pop() ?? "";
+              for (const frame of frames) handleStreamFrame(frame);
+            }
+          } catch {
+            // Stream dropped; reconnect below with exponential backoff.
+          }
+          if (!mounted || streamController.signal.aborted) return;
+          await new Promise<void>((resolve) => {
+            reconnectTimer = window.setTimeout(resolve, retryDelayMs);
+          });
+          retryDelayMs = Math.min(retryDelayMs * 2, 15_000);
+        }
+      };
+
+      void connectStream();
+
+      return () => {
+        mounted = false;
+        window.clearTimeout(initialLoad);
+        window.clearInterval(interval);
+        window.clearTimeout(reconnectTimer);
+        streamController.abort();
+        document.removeEventListener("visibilitychange", refreshWhenVisible);
+        window.removeEventListener("online", refreshWhenVisible);
+      };
+    } catch {
+      window.setTimeout(() => setOrder(null), 0);
     }
+    return () => { mounted = false; };
+  }, []);
 
-    const whatsappUrl = buildWhatsAppUrl(buildWhatsAppReviewMessage(trimmedMessage));
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-
-    setFeedbackSent(true);
-    setMessage("");
-    setIsModalOpen(false);
-  };
-
-  const reviewPrompt = feedbackSent ? "Thank you for your feedback!" : "Enjoy your meal! We'd love to hear your feedback.";
-  const isSubmitDisabled = !message.trim();
+  const orderNumber = order?.orderNumber ?? "—";
+  const prepTime = "15–20 min";
+  const displayTrackedOrders = trackedOrders.length > 0
+    ? trackedOrders
+    : order
+      ? createInitialTrackingOrders(order)
+      : [];
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
@@ -68,15 +240,12 @@ export default function OrderSuccessContent() {
         </div>
 
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-          Order Placed Successfully
+          Order Confirmed
         </h1>
-        <p className="mt-4 text-gray-600">
-          Your order has been sent via WhatsApp. We&apos;ll confirm it shortly.
-        </p>
 
         <div className="mt-8 space-y-3 rounded-2xl bg-[#F3EDFF] p-6 text-left">
-          <p className="text-sm text-gray-600">Order Number</p>
-          <p className="text-xl font-bold text-[#6C2BD9]">{orderNumber}</p>
+          <p className="text-sm text-gray-600">Order Reference</p>
+          <p className="text-xl font-bold text-[#6C2BD9]">#{orderNumber}</p>
           {order && (
             <p className="text-sm text-gray-600">
               Time: {formatOrderTime(order.timestamp)}
@@ -91,50 +260,6 @@ export default function OrderSuccessContent() {
         {order && (
           <div className="mt-6 space-y-4 text-left">
             <div className="rounded-2xl border border-[#6C2BD9]/10 bg-white p-5 text-sm">
-              <p className="font-semibold text-gray-900">
-                {order.orderType === "pickup" ? "Pickup" : "Delivery"}
-              </p>
-              {order.deliveryLocation && (
-                <p className="mt-1 text-gray-600">{order.deliveryLocation}</p>
-              )}
-            </div>
-
-            {order.canteenOrders.map((group) => (
-              <div
-                key={group.canteenSlug}
-                className="rounded-2xl border border-[#6C2BD9]/10 bg-white p-5 text-left text-sm"
-              >
-                <h2 className="font-bold text-[#6C2BD9]">{group.canteenName}</h2>
-                <dl className="mt-3 space-y-1 text-gray-600">
-                  <div>
-                    <dt className="font-medium text-gray-900">Student</dt>
-                    <dd>{order.studentName}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-900">Phone</dt>
-                    <dd>{order.phone}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-900">Items</dt>
-                    <dd>
-                      {group.items.map((item) => (
-                        <span key={item.id} className="block">
-                          {item.name}{item.size ? ` (${item.size})` : ""} ×{item.quantity}
-                        </span>
-                      ))}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-900">Total</dt>
-                    <dd className="font-semibold text-[#6C2BD9]">
-                      {formatPrice(group.subtotal)}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            ))}
-
-            <div className="rounded-2xl border border-[#6C2BD9]/10 bg-white p-5 text-sm">
               {order.deliveryFee > 0 && (
                 <div className="flex justify-between text-gray-600">
                   <span>Delivery Fee</span>
@@ -146,25 +271,35 @@ export default function OrderSuccessContent() {
                 <span className="text-[#6C2BD9]">{formatPrice(order.grandTotal)}</span>
               </div>
             </div>
+
+            {/* Delivery / Pickup Information */}
+            <div className="rounded-2xl border border-[#6C2BD9]/10 bg-white p-5 text-sm">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-[#6C2BD9]" aria-hidden />
+                <span className="font-bold text-gray-900">
+                  {order.orderType === "delivery" ? "Campus Delivery" : "Pickup"}
+                </span>
+              </div>
+              {order.orderType === "delivery" ? (
+                <p className="mt-2 text-gray-600">
+                  Delivering to: <span className="font-medium text-gray-900">{order.deliveryLocation}</span>
+                </p>
+              ) : (
+                <p className="mt-2 text-gray-600">
+                  Collect from the canteen counter
+                </p>
+              )}
+            </div>
           </div>
         )}
 
-        <div className="mt-8 rounded-2xl border border-[#6C2BD9]/10 bg-[#FAF7FF] p-6 text-left shadow-sm">
-          <p className="text-sm font-semibold text-[#6C2BD9]">{reviewPrompt}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setFeedbackSent(false);
-                setIsModalOpen(true);
-              }}
-              className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5B21B6]"
-            >
-              Leave a Review
-            </button>
-            <p className="text-sm text-gray-600">Your feedback helps us improve the campus food experience.</p>
+        {displayTrackedOrders.length > 0 && (
+          <div className="mt-6 space-y-4 text-left">
+            {displayTrackedOrders.map((tracked) => (
+              <OrderTracking key={tracked.id} order={tracked} />
+            ))}
           </div>
-        </div>
+        )}
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
@@ -175,7 +310,7 @@ export default function OrderSuccessContent() {
             Back Home
           </Link>
           <Link
-            href="/menu/ssc"
+            href="/canteens"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-[#6C2BD9] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F3EDFF]"
           >
             <UtensilsCrossed className="h-4 w-4" aria-hidden />
@@ -183,57 +318,6 @@ export default function OrderSuccessContent() {
           </Link>
         </div>
       </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 px-4 py-6">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl shadow-[#6C2BD9]/20 sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Review</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-full p-2 text-gray-500 transition hover:bg-[#F3EDFF] hover:text-[#6C2BD9]"
-                aria-label="Close review dialog"
-              >
-                <X className="h-5 w-5" aria-hidden />
-              </button>
-            </div>
-
-            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-              <div>
-                <label className="text-sm font-semibold text-gray-700" htmlFor="review-message">Review</label>
-                <textarea
-                  id="review-message"
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  className="mt-2 min-h-28 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#6C2BD9]"
-                  placeholder="Write your review here..."
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitDisabled}
-                  className="rounded-full bg-[#6C2BD9] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#5B21B6] disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  Submit Review
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

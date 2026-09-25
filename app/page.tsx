@@ -13,9 +13,6 @@ export const metadata: Metadata = createMetadata({
   path: "/",
 });
 
-const FeaturedMenu = dynamic(() => import("@/components/FeaturedMenu"), {
-  loading: () => <SectionSkeleton />,
-});
 const CTA = dynamic(() => import("@/components/CTA"), {
   loading: () => <SectionSkeleton />,
 });
@@ -46,7 +43,6 @@ export default function Home() {
       <main>
         <Hero />
         <Canteens />
-        <FeaturedMenu />
         <CTA />
         <Testimonials />
       </main>

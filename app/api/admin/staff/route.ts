@@ -3,28 +3,59 @@ import { createClient } from "@supabase/supabase-js";
 
 function getServerSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) return null;
+  return createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function getInvitationRedirectUrl(request: NextRequest): string {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  const requestOrigin = new URL(request.url).origin;
+  const isProduction = process.env.VERCEL_ENV === "production";
+  const vercelProductionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : null;
+  const origin =
+    configuredSiteUrl && !/localhost|127\.0\.0\.1/i.test(configuredSiteUrl)
+      ? configuredSiteUrl
+      : isProduction
+        ? vercelProductionUrl || requestOrigin
+        : configuredSiteUrl || requestOrigin;
+  return `${origin}/auth/callback`;
 }
 
 async function requireAdmin(request: NextRequest) {
   const supabase = getServerSupabase();
-  if (!supabase) return { error: NextResponse.json({ error: "Service unavailable" }, { status: 503 }), profile: null };
-
-  const authHeader = request.headers.get("authorization");
-  let accessToken: string | null = null;
-  if (authHeader?.startsWith("Bearer ")) {
-    accessToken = authHeader.slice(7);
+  if (!supabase) {
+    return {
+      error: NextResponse.json({ error: "Server authentication is not configured" }, { status: 503 }),
+      profile: null,
+      supabase: null,
+    };
   }
 
-  // Also try to get session from cookies via supabase
-  const { data: { user } } = await supabase.auth.getUser(accessToken ?? undefined);
+  const authHeader = request.headers.get("authorization");
+  const accessToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
 
-  if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }), profile: null };
+  if (!accessToken) {
+    return {
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      profile: null,
+      supabase,
+    };
+  }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+  if (userError || !user) {
+    return {
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      profile: null,
+      supabase,
+    };
   }
 
   const { data: profile } = await supabase
@@ -34,19 +65,22 @@ async function requireAdmin(request: NextRequest) {
     .maybeSingle();
 
   if (!profile || profile.role !== "admin" || !profile.active) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }), profile: null };
+    return {
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      profile: null,
+      supabase,
+    };
   }
 
-  return { error: null, profile };
+  return { error: null, profile, supabase };
 }
 
 // GET: List all staff users
 export async function GET(request: NextRequest) {
-  const { error, profile } = await requireAdmin(request);
+  const { error, supabase } = await requireAdmin(request);
   if (error) return error;
 
-  const supabase = getServerSupabase()!;
-  const { data, error: queryError } = await supabase
+  const { data, error: queryError } = await supabase!
     .from("staff_profiles")
     .select("id, email, name, role, canteen_id, active, created_at, updated_at")
     .order("created_at", { ascending: false });
@@ -60,51 +94,82 @@ export async function GET(request: NextRequest) {
 
 // POST: Create a new staff user
 export async function POST(request: NextRequest) {
-  const { error, profile } = await requireAdmin(request);
+  const { error, supabase } = await requireAdmin(request);
   if (error) return error;
 
-  const supabase = getServerSupabase()!;
-  const body = await request.json();
-  const { email, password, name, role, canteen_id } = body;
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  if (!email || !password || !name || !role) {
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const role = body.role;
+  const canteenId = typeof body.canteen_id === "string" ? body.canteen_id.trim() : "";
+
+  if (!email || !name || (role !== "driver" && role !== "canteen_owner")) {
     return NextResponse.json(
-      { error: "Missing required fields: email, password, name, role" },
+      { error: "Email, name, and a valid staff role are required." },
       { status: 400 },
     );
   }
 
-  // Create auth user
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  if (role === "canteen_owner" && !canteenId) {
+    return NextResponse.json(
+      { error: "A canteen is required for a canteen owner invitation." },
+      { status: 400 },
+    );
+  }
+
+  if (role === "canteen_owner") {
+    const { data: canteen, error: canteenError } = await supabase!
+      .from("canteens")
+      .select("id")
+      .eq("id", canteenId)
+      .maybeSingle();
+    if (canteenError || !canteen) {
+      return NextResponse.json({ error: "The selected canteen does not exist." }, { status: 400 });
+    }
+  }
+
+  const { data: authData, error: authError } = await supabase!.auth.admin.inviteUserByEmail(
     email,
-    password,
-  });
+    {
+      data: {
+        name,
+        role,
+        canteen_id: role === "canteen_owner" ? canteenId : null,
+      },
+      redirectTo: getInvitationRedirectUrl(request),
+    },
+  );
 
   if (authError || !authData.user) {
     return NextResponse.json(
-      { error: authError?.message ?? "Failed to create auth user" },
+      { error: authError?.message ?? "Failed to send invitation." },
       { status: 400 },
     );
   }
 
-  // Create staff profile
-  const { data: profileData, error: profileError } = await supabase
+  const { data: profileData, error: profileError } = await supabase!
     .from("staff_profiles")
     .insert({
       id: authData.user.id,
       email,
       name,
       role,
-      canteen_id: canteen_id ?? null,
+      canteen_id: role === "canteen_owner" ? canteenId : null,
       active: true,
     })
-    .select()
+    .select("id, email, name, role, canteen_id, active")
     .single();
 
   if (profileError) {
-    // Try to clean up auth user (best effort)
+    await supabase!.auth.admin.deleteUser(authData.user.id);
     return NextResponse.json(
-      { error: "Profile creation failed: " + profileError.message },
+      { error: "Invitation was not completed because the staff profile could not be created." },
       { status: 500 },
     );
   }
@@ -114,25 +179,51 @@ export async function POST(request: NextRequest) {
 
 // PUT: Update a staff user
 export async function PUT(request: NextRequest) {
-  const { error } = await requireAdmin(request);
+  const { error, supabase } = await requireAdmin(request);
   if (error) return error;
 
-  const supabase = getServerSupabase()!;
   const body = await request.json();
   const { id, name, role, canteen_id, active } = body;
 
-  if (!id) {
+  if (typeof id !== "string" || !id) {
     return NextResponse.json({ error: "Missing staff id" }, { status: 400 });
   }
 
-  const updateFields: Record<string, unknown> = {};
-  if (name !== undefined) updateFields.name = name;
-  if (role !== undefined) updateFields.role = role;
-  if (canteen_id !== undefined) updateFields.canteen_id = canteen_id;
-  if (active !== undefined) updateFields.active = active;
-  updateFields.updated_at = new Date().toISOString();
+  const validRoles = ["driver", "canteen_owner", "admin", "student"];
+  if (role !== undefined && (typeof role !== "string" || !validRoles.includes(role))) {
+    return NextResponse.json({ error: "Invalid staff role" }, { status: 400 });
+  }
 
-  const { data, error: updateError } = await supabase
+  const nextRole = role as string | undefined;
+  const nextCanteenId = typeof canteen_id === "string" ? canteen_id.trim() : canteen_id;
+  if (nextRole === "canteen_owner" && !nextCanteenId) {
+    return NextResponse.json({ error: "A canteen is required for a canteen owner" }, { status: 400 });
+  }
+
+  if (nextRole === "canteen_owner" || (role === undefined && nextCanteenId)) {
+    const { data: canteen, error: canteenError } = await supabase!
+      .from("canteens")
+      .select("id")
+      .eq("id", nextCanteenId)
+      .maybeSingle();
+    if (canteenError || !canteen) {
+      return NextResponse.json({ error: "The selected canteen does not exist." }, { status: 400 });
+    }
+  }
+
+  const updateFields: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (name !== undefined) updateFields.name = name;
+  if (role !== undefined) {
+    updateFields.role = role;
+    updateFields.canteen_id = role === "canteen_owner" ? nextCanteenId : null;
+  } else if (canteen_id !== undefined) {
+    updateFields.canteen_id = nextCanteenId || null;
+  }
+  if (active !== undefined) updateFields.active = Boolean(active);
+
+  const { data, error: updateError } = await supabase!
     .from("staff_profiles")
     .update(updateFields)
     .eq("id", id)

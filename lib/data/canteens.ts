@@ -4,7 +4,8 @@ export const canteens: Canteen[] = [
   {
     slug: "ssc",
     name: "SSC Canteen",
-    description: "Engineering students' favourite — fast food, desi meals, shakes and more.",
+    description:
+      "Engineering students' favourite — fast food, desi meals, shakes and more.",
     prepTime: "10–15 min",
     gradient: "from-[#6C2BD9] via-[#8B5CF6] to-[#A78BFA]",
     image: "/ssc-building.jpg.jpeg",
@@ -20,8 +21,9 @@ export const canteens: Canteen[] = [
   },
   {
     slug: "bhola",
-    name: "Bhôla Café",
-    description: "Fresh karahi, biryani, shakes, juices, and tang favourites for students.",
+    name: "Bhola Canteen",
+    description:
+      "Fresh karahi, desi food, shakes, juices, and refreshing drinks.",
     prepTime: "10–15 min",
     gradient: "from-[#D97706] via-[#F59E0B] to-[#FCD34D]",
     status: "active",
@@ -35,12 +37,13 @@ export const canteens: Canteen[] = [
     status: "active",
   },
   {
-    slug: "tippu-center",
-    name: "Tippu Center",
-    description: "Tippu Center canteen — menu coming soon.",
+    slug: "hot-potato",
+    name: "Hot Potato",
+    description:
+      "Sandwiches, fries, teas, and quick bites — fresh and flavourful.",
     prepTime: "10–15 min",
     gradient: "from-[#7C3AED] via-[#8B5CF6] to-[#C4B5FD]",
-    status: "coming-soon",
+    status: "active",
   },
 ];
 

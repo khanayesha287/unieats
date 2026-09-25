@@ -29,21 +29,31 @@ export default function GSCMenuPageContent({ canteenSlug }: GSCMenuPageContentPr
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
+<<<<<<< HEAD
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#F4C542]">
             {canteenSlug === "gssc" ? "GSSC Canteen" : "Bhôla Café"}
+=======
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#6C2BD9]">
+            GSSC Canteen
+>>>>>>> origin/main
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
             Menu
           </h1>
+<<<<<<< HEAD
           <p className="mt-3 max-w-2xl text-base text-white/80 sm:text-lg">
             {canteenSlug === "gssc"
               ? "Rolls, samosas, snacks, and quick bites for UET students."
               : "Fresh karahi, biryani, shakes, juices, and tang favourites for students."}
+=======
+          <p className="mt-3 max-w-2xl text-base text-gray-600 sm:text-lg">
+            Rolls, samosas, snacks, and quick bites for UET students.
+>>>>>>> origin/main
           </p>
         </div>
         <Link
           href="/canteens"
-          className="inline-flex items-center gap-2 rounded-full border border-white/30 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-white/10"
+          className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#6C2BD9]/30 hover:text-[#6C2BD9]"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           All Canteens
@@ -52,7 +62,7 @@ export default function GSCMenuPageContent({ canteenSlug }: GSCMenuPageContentPr
 
       {snacks.length > 0 && (
         <section className="mb-6">
-          <h2 className="mb-3 text-base font-bold text-white">Snacks &amp; Rolls</h2>
+          <h2 className="mb-3 text-base font-bold text-gray-900">Snacks &amp; Rolls</h2>
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
             {snacks.map((item) => (
               <FoodCard key={item.id} item={item} />
@@ -63,7 +73,7 @@ export default function GSCMenuPageContent({ canteenSlug }: GSCMenuPageContentPr
 
       {meals.length > 0 && (
         <section className="mb-6">
-          <h2 className="mb-3 text-base font-bold text-white">Meals</h2>
+          <h2 className="mb-3 text-base font-bold text-gray-900">Meals</h2>
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
             {meals.map((item) => (
               <FoodCard key={item.id} item={item} />
@@ -117,8 +127,8 @@ export default function GSCMenuPageContent({ canteenSlug }: GSCMenuPageContentPr
       )}
 
       {items.length === 0 && (
-        <div className="rounded-3xl border border-white/20 bg-white/10 p-12 text-center">
-          <p className="text-white/70">No menu items available yet.</p>
+        <div className="rounded-3xl border border-gray-100 bg-white p-12 text-center">
+          <p className="text-gray-500">No menu items available yet.</p>
         </div>
       )}
     </div>

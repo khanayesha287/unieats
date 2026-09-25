@@ -5,8 +5,8 @@ import OrderSuccessContent from "@/components/order-success/OrderSuccessContent"
 import { createMetadata } from "@/lib/seo";
 
 export const metadata = createMetadata({
-  title: "Order Placed",
-  description: "Your UniEats order has been placed successfully.",
+  title: "Order Confirmed",
+  description: "Your UniEats order is being processed.",
   path: "/order-success",
   noIndex: true,
 });

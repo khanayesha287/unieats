@@ -9,13 +9,13 @@ export default function CanteensPageContent() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <div className="mb-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#F4C542]">
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#6C2BD9]">
           UET Lahore
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
           Campus Canteens
         </h1>
-        <p className="mt-3 max-w-2xl text-base text-white/80 sm:text-lg">
+        <p className="mt-3 max-w-2xl text-base text-gray-600 sm:text-lg">
           Order online from your favourite campus canteen.
         </p>
       </div>

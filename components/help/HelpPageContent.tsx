@@ -9,7 +9,7 @@ import {
   Package,
   MessageCircle,
 } from "lucide-react";
-import { WHATSAPP_URL } from "@/lib/constants";
+import { CONTACT_EMAIL } from "@/lib/constants";
 
 const steps = [
   {
@@ -17,7 +17,7 @@ const steps = [
     number: "1",
     title: "Browse the Menu",
     description:
-      "Explore the available food items from the SSC Canteen. Browse by category to find your favourite meals, snacks, and drinks.",
+      "Explore the available food items from all campus canteens. Browse by category to find your favourite meals, snacks, and drinks.",
   },
   {
     icon: ShoppingBag,
@@ -45,7 +45,7 @@ const steps = [
     number: "5",
     title: "Choose Order Type",
     description:
-      "Select either Pickup — collect your order from the SSC Canteen — or Delivery — get your food delivered to your department, hostel, or another suitable location on campus.",
+      "Select either Pickup — collect your order from the canteen — or Delivery — get your food delivered to your department, hostel, or another suitable location on campus.",
   },
   {
     icon: CheckCircle,
@@ -112,18 +112,16 @@ export default function HelpPageContent() {
           Still need help?
         </h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-gray-600">
-          If you have a question or a problem with your order, contact UniEats
-          Support on WhatsApp and provide your Order ID.
+          If you have a question or a problem with your order, email UniEats
+          Support and provide your Order ID.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={`mailto:${CONTACT_EMAIL}`}
             className="inline-flex items-center gap-2 rounded-full bg-[#6C2BD9] px-7 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065]"
           >
             <MessageCircle className="h-4 w-4" aria-hidden />
-            WhatsApp Support
+            Email Support
           </a>
           <Link
             href="/contact"

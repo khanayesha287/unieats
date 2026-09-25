@@ -2,19 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { buildStatusUpdatePayload } from "@/lib/supabase";
+import { supabaseAuth } from "@/lib/supabase-auth";
+import type { OrderStatus } from "@/lib/types";
+import { Trash2, MoreVertical, X } from "lucide-react";
 import AIOperationsPanel from "./AIOperationsPanel";
 import StaffManagement from "./StaffManagement";
-
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "preparing"
-  | "ready"
-  | "out_for_delivery"
-  | "delivered"
-  | "completed"
-  | "cancelled";
 
 interface AdminCanteen {
   id: number | string;
@@ -41,6 +34,8 @@ interface AdminOrder {
   order_number: string;
   student_name: string;
   phone: string;
+  department?: string | null;
+  registration_number?: string | null;
   order_type: "pickup" | "delivery";
   delivery_location?: string | null;
   canteen_id?: number | string | null;
@@ -48,6 +43,9 @@ interface AdminOrder {
   status: OrderStatus;
   total_amount: number;
   delivery_charge: number;
+  discount?: number | null;
+  payment_method?: string | null;
+  special_instructions?: string | null;
   created_at?: string | null;
 }
 
@@ -158,7 +156,7 @@ function coerceDriver(input: unknown): AdminDriver | null {
 }
 
 async function fetchDashboardData() {
-  if (!supabase) {
+  if (!supabaseAuth) {
     return {
       canteens: [] as AdminCanteen[],
       drivers: [] as AdminDriver[],
@@ -170,10 +168,14 @@ async function fetchDashboardData() {
   }
 
   const [ordersResult, canteensResult, driversResult, itemsResult] = await Promise.all([
-    supabase.from("orders").select("*"),
-    supabase.from("canteens").select("*"),
-    supabase.from("driver").select("*"),
-    supabase.from("order_items").select("*"),
+    supabaseAuth.from("orders").select("*"),
+    supabaseAuth.from("canteens").select("*"),
+    supabaseAuth
+      .from("staff_profiles")
+      .select("id, name, role, active")
+      .eq("role", "driver")
+      .eq("active", true),
+    supabaseAuth.from("order_items").select("*"),
   ]);
 
   const logTableError = (tableName: string, error: { message?: string } | null) => {
@@ -233,8 +235,33 @@ async function fetchDashboardData() {
   };
 }
 
+interface AdminNotificationSummary {
+  order_id: string;
+  event_type: string;
+  status: "pending" | "processing" | "sent" | "failed";
+  last_error?: string | null;
+  updated_at?: string | null;
+  attempt_count: number;
+}
+
+async function fetchAdminNotificationStatuses(): Promise<AdminNotificationSummary[]> {
+  if (!supabaseAuth) return [];
+  const { data: sessionData } = await supabaseAuth.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) return [];
+  const response = await fetch("/api/admin/notifications/whatsapp/retry", {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as { notifications?: AdminNotificationSummary[] };
+  return Array.isArray(payload.notifications) ? payload.notifications : [];
+}
+
 export default function AdminDashboardContent() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [notificationStatuses, setNotificationStatuses] = useState<AdminNotificationSummary[]>([]);
+  const [retryingNotification, setRetryingNotification] = useState(false);
   const [canteens, setCanteens] = useState<AdminCanteen[]>([]);
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [orderItems, setOrderItems] = useState<AdminOrderItem[]>([]);
@@ -243,27 +270,45 @@ export default function AdminDashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "orders" | "ai" | "staff" | "portals">("overview");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [deleteTarget, setDeleteTarget] = useState<AdminOrder | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteMenuOpen, setDeleteMenuOpen] = useState<string | number | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     const data = await fetchDashboardData();
     setCanteens(data.canteens);
     setDrivers(data.drivers);
     setOrders(data.orders);
     setOrderItems(data.orderItems);
     setError(data.error);
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
     if (!selectedOrderId && data.orders.length > 0) {
       setSelectedOrderId(data.orders[0].id);
     }
   };
 
+  const loadNotificationStatuses = async () => {
+    setNotificationStatuses(await fetchAdminNotificationStatuses());
+  };
+
   useEffect(() => {
     void loadData();
+    void loadNotificationStatuses();
+  }, []);
+
+  // Polling fallback every 15 s — silent refresh (no loading flash)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void loadData(true);
+      void loadNotificationStatuses();
+    }, 15_000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    const client = supabase;
+    const client = supabaseAuth;
     if (!client) return;
 
     const channel = client
@@ -272,21 +317,28 @@ export default function AdminDashboardContent() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
         () => {
-          void loadData();
+          void loadData(true);
         },
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
         () => {
-          void loadData();
+          void loadData(true);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "orders" },
+        () => {
+          void loadData(true);
         },
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "order_items" },
         () => {
-          void loadData();
+          void loadData(true);
         },
       )
       .subscribe();
@@ -300,6 +352,16 @@ export default function AdminDashboardContent() {
     () => orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null,
     [orders, selectedOrderId],
   );
+
+  const notificationByOrder = useMemo(() => {
+    const map: Record<string, AdminNotificationSummary[]> = {};
+    for (const notification of notificationStatuses) {
+      const key = String(notification.order_id);
+      if (!map[key]) map[key] = [];
+      map[key].push(notification);
+    }
+    return map;
+  }, [notificationStatuses]);
 
   const canteenMap = useMemo(
     () =>
@@ -322,21 +384,64 @@ export default function AdminDashboardContent() {
     () => ({
       total: orders.length,
       pending: orders.filter((order) => order.status === "pending").length,
+      confirmed: orders.filter((order) => order.status === "confirmed").length,
       preparing: orders.filter((order) => order.status === "preparing").length,
       ready: orders.filter((order) => order.status === "ready").length,
       outForDelivery: orders.filter((order) => order.status === "out_for_delivery").length,
+      delivered: orders.filter((order) => order.status === "delivered").length,
       completed: orders.filter((order) => order.status === "completed").length,
+      cancelled: orders.filter((order) => order.status === "cancelled").length,
     }),
     [orders],
   );
 
+  const filteredOrders = useMemo(() => {
+    if (statusFilter === "all") return orders;
+    return orders.filter((order) => order.status === statusFilter);
+  }, [orders, statusFilter]);
+
+  const handleDeleteOrder = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      if (!supabaseAuth) throw new Error("Authentication service unavailable.");
+      const { error: itemDeleteError } = await supabaseAuth
+        .from("order_items")
+        .delete()
+        .eq("order_id", deleteTarget.id);
+      if (itemDeleteError) throw new Error(itemDeleteError.message);
+      const { error: orderDeleteError } = await supabaseAuth
+        .from("orders")
+        .delete()
+        .eq("id", deleteTarget.id);
+      if (orderDeleteError) throw new Error(orderDeleteError.message);
+      setOrders((current) => current.filter((o) => String(o.id) !== String(deleteTarget.id)));
+      if (String(selectedOrderId) === String(deleteTarget.id)) {
+        setSelectedOrderId(null);
+      }
+      setError(null);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[UniEats Admin] Delete order failed:", errMsg);
+      setError("Failed to delete order. Check the browser console for details.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
   const updateOrderStatus = async (orderId: number | string, nextStatus: OrderStatus) => {
-    if (!supabase) return;
+    if (!supabaseAuth) return;
 
     setIsUpdating(true);
-    const { error: updateError } = await supabase
+
+    // Build payload with status timestamp (same as canteen/driver portals)
+    const order = orders.find((o) => String(o.id) === String(orderId));
+    const payload = buildStatusUpdatePayload(nextStatus, order as unknown as Record<string, unknown>);
+
+    const { error: updateError } = await supabaseAuth
       .from("orders")
-      .update({ status: nextStatus })
+      .update(payload)
       .eq("id", orderId);
 
     setIsUpdating(false);
@@ -348,17 +453,17 @@ export default function AdminDashboardContent() {
     }
 
     setOrders((current) =>
-      current.map((order) =>
-        String(order.id) === String(orderId) ? { ...order, status: nextStatus } : order,
+      current.map((o) =>
+        String(o.id) === String(orderId) ? { ...o, status: nextStatus } : o,
       ),
     );
   };
 
   const updateOrderDriver = async (orderId: number | string, nextDriverId: string) => {
-    if (!supabase) return;
+    if (!supabaseAuth) return;
 
     const normalizedDriverId = nextDriverId === "" ? null : nextDriverId;
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAuth
       .from("orders")
       .update({ driver_id: normalizedDriverId })
       .eq("id", orderId);
@@ -378,12 +483,22 @@ export default function AdminDashboardContent() {
     );
   };
 
-  const insertTestOrder = async () => {
-    if (!supabase) {
-      setError("Supabase is not configured, so a test order cannot be inserted.");
-      return;
+  const retrySelectedNotification = async () => {
+    if (!selectedOrder || !supabaseAuth) return;
+    const { data: sessionData } = await supabaseAuth.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    setRetryingNotification(true);
+    try {
+      await fetch("/api/admin/notifications/whatsapp/retry", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: [String(selectedOrder.id)] }),
+      });
+      await loadNotificationStatuses();
+    } finally {
+      setRetryingNotification(false);
     }
-
     if (process.env.NODE_ENV === "production") {
       setError("Test-order insertion is disabled in production.");
       return;
@@ -446,10 +561,6 @@ export default function AdminDashboardContent() {
       console.error("[UniEats Admin] Test order items insert failed:", itemsError.message);
       setError("The test order was created but its items did not insert correctly.");
       return;
-    }
-
-    await loadData();
-    setSelectedOrderId(orderId);
   };
 
   const renderSummaryCard = (label: string, value: number, accent: string) => (
@@ -479,16 +590,6 @@ export default function AdminDashboardContent() {
               Operations Dashboard
             </h1>
           </div>
-
-          {process.env.NODE_ENV !== "production" && (
-            <button
-              type="button"
-              onClick={() => void insertTestOrder()}
-              className="inline-flex items-center justify-center rounded-full bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
-            >
-              Insert Test Order
-            </button>
-          )}
         </div>
 
         {error && (
@@ -524,13 +625,12 @@ export default function AdminDashboardContent() {
         {/* Overview tab */}
         {activeTab === "overview" && (
           <>
-            <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-              {renderSummaryCard("Total orders", counts.total, "bg-violet-100 text-violet-700")}
+            <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               {renderSummaryCard("Pending", counts.pending, "bg-amber-100 text-amber-700")}
               {renderSummaryCard("Preparing", counts.preparing, "bg-violet-100 text-violet-700")}
               {renderSummaryCard("Ready", counts.ready, "bg-emerald-100 text-emerald-700")}
               {renderSummaryCard("Out for delivery", counts.outForDelivery, "bg-cyan-100 text-cyan-700")}
-              {renderSummaryCard("Completed", counts.completed, "bg-green-100 text-green-700")}
+              {renderSummaryCard("Delivered", counts.delivered, "bg-blue-100 text-blue-700")}
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <Link
@@ -565,25 +665,56 @@ export default function AdminDashboardContent() {
         {/* Orders tab */}
         {activeTab === "orders" && (
         <>
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          {renderSummaryCard("Total orders", counts.total, "bg-violet-100 text-violet-700")}
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {renderSummaryCard("Pending", counts.pending, "bg-amber-100 text-amber-700")}
           {renderSummaryCard("Preparing", counts.preparing, "bg-violet-100 text-violet-700")}
           {renderSummaryCard("Ready", counts.ready, "bg-emerald-100 text-emerald-700")}
           {renderSummaryCard("Out for delivery", counts.outForDelivery, "bg-cyan-100 text-cyan-700")}
-          {renderSummaryCard("Completed", counts.completed, "bg-green-100 text-green-700")}
+          {renderSummaryCard("Delivered", counts.delivered, "bg-blue-100 text-blue-700")}
         </div>
 
+        {/* Status filter tabs */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {([
+            { value: "all" as const, label: "All" },
+            { value: "pending" as const, label: "Pending" },
+            { value: "confirmed" as const, label: "Confirmed" },
+            { value: "preparing" as const, label: "Preparing" },
+            { value: "ready" as const, label: "Ready" },
+            { value: "out_for_delivery" as const, label: "Out for Delivery" },
+            { value: "delivered" as const, label: "Delivered" },
+            { value: "cancelled" as const, label: "Cancelled" },
+          ]).map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              onClick={() => setStatusFilter(filter.value)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                statusFilter === filter.value
+                  ? "bg-violet-600 text-white shadow-md"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {filter.label}
+              {filter.value === "all"
+                ? ` (${orders.length})`
+                : ` (${orders.filter((o) => o.status === filter.value).length})`}
+            </button>
+          ))}
+        </div>
+        
         <div className="grid gap-6 xl:grid-cols-[1.7fr_0.9fr]">
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
               <h2 className="text-lg font-bold text-slate-900">Recent Orders</h2>
             </div>
-
+        
             {isLoading ? (
               <div className="p-6 text-sm text-slate-600">Loading orders…</div>
-            ) : orders.length === 0 ? (
-              <div className="p-6 text-sm text-slate-600">No orders found in Supabase.</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="p-6 text-center text-sm text-slate-500">
+                {statusFilter === "all" ? "No orders yet." : `No ${statusFilter.replace(/_/g, " ")} orders.`}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
@@ -594,12 +725,17 @@ export default function AdminDashboardContent() {
                       <th className="px-4 py-3 font-semibold">Canteen</th>
                       <th className="px-4 py-3 font-semibold">Total</th>
                       <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Payment</th>
                       <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">WhatsApp</th>
+                      <th className="px-4 py-3 font-semibold">Time</th>
+                      <th className="px-4 py-3 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {orders.map((order) => {
+                    {filteredOrders.map((order) => {
                       const canteen = canteenMap[String(order.canteen_id ?? "")];
+                      const isOpen = deleteMenuOpen === order.id;
                       return (
                         <tr
                           key={String(order.id)}
@@ -613,6 +749,10 @@ export default function AdminDashboardContent() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-slate-900">{order.student_name}</div>
+<<<<<<< HEAD
+=======
+                            <div className="text-xs text-slate-500">{order.registration_number || order.department || "\u2014"}</div>
+>>>>>>> origin/main
                           </td>
                           <td className="px-4 py-3 text-slate-600">
                             {canteen?.name ?? "Unknown canteen"}
@@ -623,10 +763,71 @@ export default function AdminDashboardContent() {
                           <td className="px-4 py-3 capitalize text-slate-600">
                             {order.order_type === "delivery" ? "Delivery" : "Pickup"}
                           </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {order.payment_method === "cod"
+                              ? "COD"
+                              : order.payment_method === "online"
+                                ? "Online"
+                                : "\u2014"}
+                          </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}>
                               {order.status.replace(/_/g, " ")}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {(() => {
+                              const statuses = notificationByOrder[String(order.id)] ?? [];
+                              const failed = statuses.some((item) => item.status === "failed");
+                              const pending = statuses.some((item) => item.status === "pending" || item.status === "processing");
+                              return (
+                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  failed ? "bg-red-100 text-red-700" : pending ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                                }`}>
+                                  {failed ? "Failed" : pending ? "Pending" : statuses.length ? "Sent" : "Not queued"}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            {order.created_at ? formatDate(order.created_at) : "\u2014"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteMenuOpen(isOpen ? null : order.id);
+                                }}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                aria-label="Order actions"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                              {isOpen && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={(e) => { e.stopPropagation(); setDeleteMenuOpen(null); }}
+                                  />
+                                  <div className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteMenuOpen(null);
+                                        setDeleteTarget(order);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Delete Order
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -661,6 +862,24 @@ export default function AdminDashboardContent() {
                     <p className="font-semibold text-slate-900">{selectedOrder.phone}</p>
                   </div>
                   <div>
+                    <p className="text-slate-500">Department</p>
+                    <p className="font-semibold text-slate-900">{selectedOrder.department ?? "\u2014"}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Registration No.</p>
+                    <p className="font-semibold text-slate-900">{selectedOrder.registration_number ?? "\u2014"}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Payment Method</p>
+                    <p className="font-semibold text-slate-900">
+                      {selectedOrder.payment_method === "cod"
+                        ? "Cash on Delivery"
+                        : selectedOrder.payment_method === "online"
+                          ? "Online Payment"
+                          : selectedOrder.payment_method ?? "\u2014"}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-slate-500">Canteen</p>
                     <p className="font-semibold text-slate-900">{selectedCanteenName}</p>
                   </div>
@@ -679,6 +898,21 @@ export default function AdminDashboardContent() {
                   <div>
                     <p className="text-slate-500">Order time</p>
                     <p className="font-semibold text-slate-900">{formatDate(selectedOrder.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">WhatsApp notifications</p>
+                    <div className="mt-1 space-y-1">
+                      {(notificationByOrder[String(selectedOrder.id)] ?? []).map((notification) => (
+                        <p key={`${notification.order_id}-${notification.event_type}`} className={`text-xs font-semibold ${notification.status === "failed" ? "text-red-600" : notification.status === "sent" ? "text-emerald-600" : "text-amber-600"}`}>
+                          {notification.event_type.replace(/_/g, " ")}: {notification.status}
+                        </p>
+                      ))}
+                      {(notificationByOrder[String(selectedOrder.id)] ?? []).some((item) => item.status === "failed") && (
+                        <button type="button" onClick={() => void retrySelectedNotification()} disabled={retryingNotification} className="mt-2 rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                          {retryingNotification ? "Retrying…" : "Retry failed notifications"}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -728,6 +962,12 @@ export default function AdminDashboardContent() {
                       <span>Delivery charge</span>
                       <span>{formatCurrency(Number(selectedOrder.delivery_charge ?? 0))}</span>
                     </div>
+                    {selectedOrder.discount !== null && selectedOrder.discount !== undefined && Number(selectedOrder.discount) > 0 && (
+                      <div className="mb-2 flex items-center justify-between text-sm text-emerald-600">
+                        <span>Discount</span>
+                        <span>-{formatCurrency(Number(selectedOrder.discount))}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-base font-bold text-slate-900">
                       <span>Total</span>
                       <span>{formatCurrency(Number(selectedOrder.total_amount ?? 0))}</span>
@@ -777,17 +1017,39 @@ export default function AdminDashboardContent() {
 
         {/* Portals tab */}
         {activeTab === "portals" && (
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900">Canteen Portal</h3>
-              <p className="mt-2 text-sm text-slate-600">Access the full canteen operations portal to manage orders across all canteens.</p>
-              <Link
-                href="/canteen"
-                className="mt-4 inline-flex rounded-full bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
-              >
-                Open Canteen Portal
-              </Link>
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Canteen Portals</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Select any configured canteen to open its operations portal.
+              </p>
             </div>
+            {canteens.length === 0 ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+                No canteens are available in Supabase.
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {canteens.map((canteen) => (
+                  <div
+                    key={String(canteen.id)}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
+                      Canteen Portal
+                    </p>
+                    <h3 className="mt-2 text-lg font-bold text-slate-900">{canteen.name}</h3>
+                    <Link
+                      href={`/canteen?canteen_id=${encodeURIComponent(String(canteen.id))}`}
+                      className="mt-4 inline-flex rounded-full bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
+                    >
+                      Open {canteen.name}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="text-lg font-bold text-slate-900">Driver Portal</h3>
               <p className="mt-2 text-sm text-slate-600">Access the driver portal to monitor deliveries and driver activity.</p>
@@ -801,6 +1063,50 @@ export default function AdminDashboardContent() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Delete this order?</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Order <span className="font-semibold">#{deleteTarget.order_number}</span> from {deleteTarget.student_name}.
+                  This action cannot be undone.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteOrder()}
+                disabled={isDeleting}
+                className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
