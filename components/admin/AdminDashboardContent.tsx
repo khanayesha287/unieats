@@ -499,6 +499,68 @@ export default function AdminDashboardContent() {
     } finally {
       setRetryingNotification(false);
     }
+    if (process.env.NODE_ENV === "production") {
+      setError("Test-order insertion is disabled in production.");
+      return;
+    }
+
+    const fallbackCanteen = canteens[0];
+    if (!fallbackCanteen) {
+      setError("No canteen record was found in Supabase to associate with a test order.");
+      return;
+    }
+
+    const fallbackDriver = drivers[0];
+    const orderNumber = String(Math.floor(1000 + Math.random() * 9000));
+    const totalAmount = 560;
+    const deliveryCharge = 0;
+
+    const { data: insertedOrder, error: orderInsertError } = await supabase
+      .from("orders")
+      .insert([
+        {
+          order_number: orderNumber,
+          student_name: "Development Test",
+          phone: "03123456789",
+          delivery_location: null,
+          order_type: "pickup",
+          canteen_id: fallbackCanteen.id,
+          status: "pending",
+          total_amount: totalAmount,
+          delivery_charge: deliveryCharge,
+          driver_id: fallbackDriver?.id ?? null,
+        },
+      ])
+      .select("id")
+      .single();
+
+    if (orderInsertError) {
+      console.error("[UniEats Admin] Test order insert failed:", orderInsertError.message);
+      setError("Test order insertion failed. Check the browser console for details.");
+      return;
+    }
+
+    const orderId = insertedOrder?.id;
+    if (!orderId) {
+      setError("The test order was inserted but no order id was returned.");
+      return;
+    }
+
+    const { error: itemsError } = await supabase.from("order_items").insert([
+      {
+        order_id: orderId,
+        menu_item_id: null,
+        item_name: "Development Test Item",
+        quantity: 2,
+        price: 280,
+        subtotal: 560,
+      },
+    ]);
+
+    if (itemsError) {
+      console.error("[UniEats Admin] Test order items insert failed:", itemsError.message);
+      setError("The test order was created but its items did not insert correctly.");
+      return;
   };
 
   const renderSummaryCard = (label: string, value: number, accent: string) => (
@@ -687,7 +749,10 @@ export default function AdminDashboardContent() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-slate-900">{order.student_name}</div>
+<<<<<<< HEAD
+=======
                             <div className="text-xs text-slate-500">{order.registration_number || order.department || "\u2014"}</div>
+>>>>>>> origin/main
                           </td>
                           <td className="px-4 py-3 text-slate-600">
                             {canteen?.name ?? "Unknown canteen"}

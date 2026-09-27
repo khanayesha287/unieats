@@ -144,7 +144,7 @@ function coerceOrder(input: unknown): DriverOrder | null {
       ? record.delivery_charge
       : Number(record.delivery_charge ?? 0);
 
-  return {
+   return {
     id:
       typeof id === "number" || typeof id === "string"
         ? id
@@ -403,6 +403,61 @@ export default function DriverPortalContent() {
     setError(null);
   };
 
+  const insertTestDelivery = async () => {
+    if (!supabase) return;
+    const canteen = canteens[0];
+    if (!canteen) {
+      setError("No canteen found to create a test delivery.");
+      return;
+    }
+
+    const orderNumber = String(Math.floor(1000 + Math.random() * 9000));
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("orders")
+      .insert([{
+        order_number: orderNumber,
+        student_name: "Test Delivery Student",
+        phone: "03001234567",
+        delivery_location: "CS Department, Block A",
+        order_type: "delivery",
+        canteen_id: canteen.id,
+        status: "ready",
+        total_amount: 450,
+        delivery_charge: 55,
+        driver_id: null,
+      }])
+      .select("id")
+      .single();
+
+    if (insertError) {
+      console.error("[UniEats Driver] Test delivery insert failed:", insertError.message);
+      setError("Test delivery insert failed.");
+      return;
+    }
+
+    const orderId = inserted?.id;
+    if (orderId) {
+      await supabase.from("order_items").insert([{
+        order_id: orderId,
+        menu_item_id: null,
+        item_name: "Test Delivery Burger",
+        quantity: 2,
+        price: 175,
+        subtotal: 350,
+      }, {
+        order_id: orderId,
+        menu_item_id: null,
+        item_name: "Test Delivery Fries",
+        quantity: 1,
+        price: 100,
+        subtotal: 100,
+      }]);
+    }
+
+    await loadData();
+  };
+
   return (
     <div className="min-h-screen bg-[#f8f5ff] pb-24 text-slate-900">
       {/* Sticky header */}
@@ -518,11 +573,14 @@ export default function DriverPortalContent() {
                               <p className="mt-1 text-sm font-medium text-slate-800">
                                 {order.student_name}
                               </p>
+<<<<<<< HEAD
+=======
                               {order.department && (
                                 <p className="text-xs text-slate-500">
                                   {order.department}
                                 </p>
                               )}
+>>>>>>> origin/main
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-bold text-slate-900">
@@ -573,11 +631,14 @@ export default function DriverPortalContent() {
                                   >
                                     {order.phone}
                                   </a>
+<<<<<<< HEAD
+=======
                                   {order.department && (
                                     <p className="text-xs text-slate-500">
                                       {order.department}
                                     </p>
                                   )}
+>>>>>>> origin/main
                                 </div>
                               </div>
 

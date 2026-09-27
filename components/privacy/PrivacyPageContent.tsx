@@ -6,7 +6,7 @@ const sections = [
     number: "1",
     title: "Information We Collect",
     content:
-      "When you place an order, we may collect your name, registration number, contact details, order details, and delivery information.",
+      "When you place an order, we may collect your name, contact details, order details, and delivery information.",
   },
   {
     number: "2",

@@ -84,13 +84,28 @@ const menuImageMap: Record<string, string> = {
 };
 
 export function getMenuImage(name: string): string {
-  // Try direct match or key normalization
+  const normalized = name.trim().toLowerCase();
+
   if (name in menuImageMap) return menuImageMap[name];
-  if (name.startsWith("Deal ")) {
-    if (name === "Deal 1") return "/menu/1-sandwich-1-fries.jpg.png"; // wait, let's map other deals too if needed, but let's check
+  if (normalized.includes("biryani")) return "/menu/chicken-biryani.jpg.png";
+  if (normalized.includes("karahi")) return "/menu/chicken-karahi.jpg.png";
+  if (normalized.includes("qorma")) return "/menu/desi-food-category.jpg.png";
+  if (normalized.includes("pulao")) return "/menu/desi-food-category.jpg.png";
+  if (normalized.includes("daal") || normalized.includes("chana") || normalized.includes("masser")) return "/menu/desi-food-category.jpg.png";
+  if (normalized.includes("shake")) return "/menu/shakes-juices-category.jpg.png";
+  if (normalized.includes("juice") || normalized.includes("tang") || normalized.includes("soda")) return "/menu/shakes-juices-category.jpg.png";
+  if (normalized.includes("paratha") || normalized.includes("chai")) return "/menu/chai-paratha-category.jpg.png";
+  if (normalized.includes("samosa") || normalized.includes("roll")) return "/menu/fast-food-category.jpg.png";
+  if (normalized.includes("pizza")) return "/menu/pizza.jpg.png";
+  if (normalized.includes("burger") || normalized.includes("zinger")) return "/menu/zinger-burger.jpg";
+  if (normalized.includes("shawarma")) return "/menu/shawarma-roll.jpg";
+  if (normalized.includes("fries") || normalized.includes("pasta")) return "/menu/small-fries.jpg";
+  if (normalized.startsWith("deal ")) {
+    if (name === "Deal 1") return "/menu/1-sandwich-1-fries.jpg.png";
   }
   return "/menu/placeholder.jpg";
 }
+
 
 export const menuItems: MenuItem[] = [
   {
@@ -1008,18 +1023,6 @@ export const menuItems: MenuItem[] = [
 
   // Desi Food Category
   {
-    id: "ssc-desi-biryani",
-    name: "Chicken Biryani",
-    description: "Fragrant basmati rice cooked with spiced chicken and aromatic herbs.",
-    price: 270,
-    category: "desi-food",
-    rating: 5,
-    available: true,
-    canteenSlug: "ssc",
-    gradient: "from-[#6C2BD9]/30 to-[#F4C542]/40",
-    image: "/menu/chicken-biryani.jpg.png",
-  },
-  {
     id: "ssc-desi-karahi",
     name: "Chicken Karahi",
     description: "Classic spicy stir-fried chicken cooked in a traditional wok.",
@@ -1425,7 +1428,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-malai-boti-samosa",
@@ -1437,7 +1444,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-aalo-samosa",
@@ -1449,7 +1460,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-chicken-samosa",
@@ -1461,7 +1476,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-vegetable-roll",
@@ -1473,7 +1492,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-ziger-samosa",
@@ -1486,6 +1509,7 @@ export const menuItems: MenuItem[] = [
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
     image: "/menu/gssc-menu.png",
+
   },
   {
     id: "gssc-snacks-pizza-samosa",
@@ -1497,7 +1521,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-shawarma-roll",
@@ -1509,7 +1537,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-macaroni-samosa",
@@ -1521,7 +1553,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-cheez-samosa",
@@ -1533,7 +1569,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-snacks-seekh-kabab-roll",
@@ -1545,7 +1585,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
 
   // GSSC Canteen — Meals
@@ -1559,7 +1603,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
   {
     id: "gssc-meals-chicken-qeema",
@@ -1571,7 +1619,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
+<<<<<<< HEAD
+    
+=======
     image: "/menu/gssc-menu.png",
+>>>>>>> origin/main
   },
 
 
@@ -1883,6 +1935,282 @@ export const menuItems: MenuItem[] = [
   },
 
   // Annexe Canteen
+  {
+    id: "bhola-main-chicken-fresh-karahi-1kg",
+    name: "Chicken Fresh Karahi",
+    description: "1kg chicken karahi with 8 rotis — rich, hearty, and perfect for sharing.",
+    price: 1349,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#D97706]/25 to-[#FCD34D]/25",
+    image: "/menu/chicken-karahi.jpg.png",
+  },
+  {
+    id: "bhola-main-chicken-karahi-half",
+    name: "Chicken Karahi",
+    description: "Half kg chicken karahi with 4 rotis — a student favourite.",
+    price: 749,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/30 to-[#D97706]/25",
+    image: "/menu/chicken-karahi.jpg.png",
+  },
+  {
+    id: "bhola-main-chicken-fresh-karahi-3pao",
+    name: "Chicken Fresh Karahi",
+    description: "3 pao chicken karahi with 6 rotis — packed for a satisfying meal.",
+    price: 999,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#D97706]/25 to-[#F59E0B]/25",
+    image: "/menu/chicken-karahi.jpg.png",
+  },
+  {
+    id: "bhola-main-chicken-qorma",
+    name: "Chicken Qorma",
+    description: "Slow-cooked chicken qorma with a rich and aromatic gravy.",
+    price: 199,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/25 to-[#D97706]/20",
+    image: "/menu/desi-food-category.jpg.png",
+  },
+  {
+    id: "bhola-main-chicken-biryani",
+    name: "Chicken Biryani",
+    description: "Aromatic chicken biryani with classic desi flavour.",
+    price: 230,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/20 to-[#D97706]/25",
+    image: "/menu/chicken-biryani.jpg.png",
+  },
+  {
+    id: "bhola-main-chicken-shami-pulao",
+    name: "Chicken Shami Pulao",
+    description: "Tender chicken shami pulao with fragrant rice and spices.",
+    price: 220,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#D97706]/20 to-[#FCD34D]/20",
+    image: "/menu/desi-food-category.jpg.png",
+  },
+  {
+    id: "bhola-main-sabit-masser",
+    name: "Sabit Masser",
+    description: "Traditional sabit masser served with rich flavour and warmth.",
+    price: 150,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/20 to-[#D97706]/20",
+    image: "/menu/desi-food-category.jpg.png",
+  },
+  {
+    id: "bhola-main-chicken-masser",
+    name: "Chicken Masser",
+    description: "Flavourful chicken masser cooked in a hearty traditional style.",
+    price: 299,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#D97706]/20 to-[#F59E0B]/25",
+    image: "/menu/desi-food-category.jpg.png",
+  },
+  {
+    id: "bhola-main-daal-chana",
+    name: "Daal Chana",
+    description: "Comforting daal chana with a warm, homely taste.",
+    price: 150,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/15 to-[#D97706]/20",
+    image: "/menu/desi-food-category.jpg.png",
+  },
+  {
+    id: "bhola-main-chicken-daal-chana",
+    name: "Chicken Daal Chana",
+    description: "A satisfying mix of daal chana and chicken in one bowl.",
+    price: 299,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#D97706]/20 to-[#FCD34D]/20",
+    image: "/menu/desi-food-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-banana-shake",
+    name: "Banana Shake",
+    description: "Creamy banana shake made fresh and cold.",
+    price: 120,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F4C542]/25 to-[#D97706]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-mango-shake",
+    name: "Mango Shake",
+    description: "Refreshing mango shake with a rich tropical taste.",
+    price: 120,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/25 to-[#D97706]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-mango-juice",
+    name: "Mango Juice",
+    description: "Fresh mango juice served cold and full of flavour.",
+    price: 120,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F4C542]/20 to-[#D97706]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-oreo-shake",
+    name: "Oreo Shake",
+    description: "An indulgent Oreo shake for a sweet break.",
+    price: 120,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#7C3AED]/25 to-[#D97706]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-coffee-shake",
+    name: "Coffee Shake",
+    description: "Cold coffee shake blended to a smooth finish.",
+    price: 130,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#7C3AED]/20 to-[#F59E0B]/20",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-chocolate-shake",
+    name: "Chocolate Shake",
+    description: "Creamy chocolate shake with a smooth, rich finish.",
+    price: 130,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#D97706]/25 to-[#7C3AED]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-coffee-crunch-shake",
+    name: "Coffee Crunch Shake",
+    description: "A crunchy coffee shake with a comforting blend of sweetness and coffee.",
+    price: 150,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#D97706]/25 to-[#7C3AED]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-peach-juice",
+    name: "Peach Juice",
+    description: "Peach juice served chilled and refreshing.",
+    price: 120,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/20 to-[#F97316]/20",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-juice-peach-shake",
+    name: "Peach Shake",
+    description: "Peach shake with a smooth refreshing taste.",
+    price: 120,
+    category: "shakes-and-juices",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/25 to-[#F4C542]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-drink-orange-tang",
+    name: "Orange Tang",
+    description: "Tangy orange fizz drink with a bright citrus finish.",
+    price: 69,
+    category: "drinks",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/25 to-[#F97316]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-drink-mango-tang",
+    name: "Mango Tang",
+    description: "Sweet mango flavour in a refreshing tang drink.",
+    price: 69,
+    category: "drinks",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F59E0B]/25 to-[#F4C542]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-drink-pineapple-tang",
+    name: "Pineapple Tang",
+    description: "Fresh pineapple tang served cold for a zesty sip.",
+    price: 69,
+    category: "drinks",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F4C542]/25 to-[#F59E0B]/25",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
+  {
+    id: "bhola-drink-lemon-soda",
+    name: "Lemon Soda",
+    description: "Cool lemon soda with a fizzy, refreshing finish.",
+    price: 99,
+    category: "drinks",
+    rating: 5,
+    available: true,
+    canteenSlug: "bhola",
+    gradient: "from-[#F4C542]/20 to-[#D97706]/20",
+    image: "/menu/shakes-juices-category.jpg.png",
+  },
   {
     id: "annexe-shake-panga",
     name: "Panga",
@@ -2335,6 +2663,13 @@ export const menuItems: MenuItem[] = [
     sizes: { Small: 300, Large: 400 },
   },
 ];
+
+for (const item of menuItems) {
+  if (!item.image || item.image === "/menu/placeholder.jpg") {
+    item.image = getMenuImage(item.name);
+  }
+}
+
 export function getMenuByCanteen(slug: string): MenuItem[] {
   return menuItems.filter((item) => item.canteenSlug === slug);
 }
@@ -2342,3 +2677,4 @@ export function getMenuByCanteen(slug: string): MenuItem[] {
 export function getMenuItemById(id: string): MenuItem | undefined {
   return menuItems.find((item) => item.id === id);
 }
+
