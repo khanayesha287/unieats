@@ -10,14 +10,8 @@ export default function HotPotatoMenuPageContent() {
   const items = menuItems.filter((item) => item.canteenSlug === "hot-potato");
 
   const sandwiches = items.filter((item) => item.name.includes("Sandwich"));
-  const tea = items.filter(
-    (item) =>
-      item.id.startsWith("hp-tea-")
-  );
-  const greenTea = items.filter(
-    (item) =>
-      item.id.startsWith("hp-greentea-")
-  );
+  const tea = items.filter((item) => item.id.startsWith("hp-tea-"));
+  const greenTea = items.filter((item) => item.id.startsWith("hp-greentea-"));
   const regularItems = items.filter(
     (item) =>
       item.id.startsWith("hp-regular-") ||
@@ -27,6 +21,7 @@ export default function HotPotatoMenuPageContent() {
   );
   const masalaFries = items.filter((item) => item.id.startsWith("hp-masala-"));
   const loadedFries = items.filter((item) => item.id.startsWith("hp-loaded-"));
+  const teas = [...tea, ...greenTea];
 
   return (
     <>
@@ -52,33 +47,22 @@ export default function HotPotatoMenuPageContent() {
           </Link>
         </div>
 
-        {sandwiches.length > 0 && (
+        {loadedFries.length > 0 && (
           <section className="mb-6">
-            <h2 className="mb-3 text-base font-bold text-gray-900">Sandwich</h2>
+            <h2 className="mb-3 text-base font-bold text-gray-900">Loaded Fries</h2>
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
-              {sandwiches.map((item) => (
+              {loadedFries.map((item) => (
                 <FoodCard key={item.id} item={item} />
               ))}
             </div>
           </section>
         )}
 
-        {tea.length > 0 && (
+        {masalaFries.length > 0 && (
           <section className="mb-6">
-            <h2 className="mb-3 text-base font-bold text-gray-900">Tea</h2>
+            <h2 className="mb-3 text-base font-bold text-gray-900">Masala Fries</h2>
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
-              {tea.map((item) => (
-                <FoodCard key={item.id} item={item} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {greenTea.length > 0 && (
-          <section className="mb-6">
-            <h2 className="mb-3 text-base font-bold text-gray-900">Green Tea</h2>
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
-              {greenTea.map((item) => (
+              {masalaFries.map((item) => (
                 <FoodCard key={item.id} item={item} />
               ))}
             </div>
@@ -96,11 +80,22 @@ export default function HotPotatoMenuPageContent() {
           </section>
         )}
 
-        {masalaFries.length > 0 && (
+        {sandwiches.length > 0 && (
           <section className="mb-6">
-            <h2 className="mb-3 text-base font-bold text-gray-900">Masala Fries</h2>
+            <h2 className="mb-3 text-base font-bold text-gray-900">Sandwiches</h2>
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
-              {masalaFries.map((item) => (
+              {sandwiches.map((item) => (
+                <FoodCard key={item.id} item={item} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {teas.length > 0 && (
+          <section className="mb-6">
+            <h2 className="mb-3 text-base font-bold text-gray-900">Teas</h2>
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
+              {teas.map((item) => (
                 <FoodCard key={item.id} item={item} />
               ))}
             </div>

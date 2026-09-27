@@ -11,6 +11,19 @@ export function calculateSubtotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 }
 
+export function formatCartItemName(
+  item: Pick<CartItem, "name" | "size" | "selectedAddOns">,
+): string {
+  if (!item.selectedAddOns?.length) return item.name;
+
+  const selections = [
+    item.size,
+    ...item.selectedAddOns.map((addOn) => `${addOn.name} topping`),
+  ].filter((selection): selection is string => Boolean(selection));
+
+  return `${item.name} (${selections.join(", ")})`;
+}
+
 export function calculateItemCount(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.quantity, 0);
 }
@@ -60,9 +73,7 @@ export function buildOrder(
   return {
     orderNumber,
     studentName: form.studentName,
-    registrationNumber: form.registrationNumber.trim() || undefined,
     phone: form.phone,
-    department: form.department,
     orderType: form.orderType,
     deliveryLocation:
       form.orderType === "delivery" ? form.deliveryLocation : undefined,

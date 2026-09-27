@@ -36,7 +36,13 @@ export interface MenuItem {
   gradient: string;
   image?: string;
   sizes?: Record<string, number>;
+  addOns?: MenuItemOption[];
   menuSection?: MenuSection;
+}
+
+export interface MenuItemOption {
+  name: string;
+  price: number;
 }
 
 export interface CartItem {
@@ -48,6 +54,7 @@ export interface CartItem {
   canteenName: string;
   gradient: string;
   size?: string;
+  selectedAddOns?: MenuItemOption[];
   /** Resolved database canteen ID (optional — resolved at checkout if absent). */
   canteenId?: string | number | null;
 }
@@ -71,10 +78,7 @@ export type OrderStatus =
 
 export interface CheckoutFormData {
   studentName: string;
-  /** University registration number (guest checkout — optional identifier). */
-  registrationNumber: string;
   phone: string;
-  department: string;
   orderType: OrderType;
   deliveryLocation: string;
   specialInstructions: string;
@@ -95,10 +99,10 @@ export interface CanteenOrderGroup {
 export interface Order {
   orderNumber: string;
   studentName: string;
-  /** University registration number, if provided at checkout. */
+  /** Legacy identifier retained for orders created before checkout stopped collecting it. */
   registrationNumber?: string;
   phone: string;
-  department: string;
+  department?: string;
   orderType: OrderType;
   deliveryLocation?: string;
   specialInstructions?: string;

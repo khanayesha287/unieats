@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Clock, Home, MapPin, UtensilsCrossed } from "lucide-react";
 import { formatPrice } from "@/lib/format";
-import { formatOrderTime } from "@/lib/cart-utils";
+import { formatCartItemName, formatOrderTime } from "@/lib/cart-utils";
 import OrderTracking from "@/components/ui/OrderTracking";
 import { TRACKING_STATUSES, type TrackedOrder, type TrackingStatus } from "@/lib/order-tracking";
 import type { Order } from "@/lib/types";
@@ -25,7 +25,7 @@ function createInitialTrackingOrders(savedOrder: Order): TrackedOrder[] {
     createdAt: savedOrder.timestamp,
     items: group.items.map((item) => ({
       id: item.id,
-      itemName: item.name,
+      itemName: formatCartItemName(item),
       quantity: item.quantity,
       price: Number(item.price),
       subtotal: Number(item.price * item.quantity),

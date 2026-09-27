@@ -19,12 +19,13 @@ export default function FoodCard({ item, showCanteenBadge = false }: FoodCardPro
   const [qty, setQty] = useState(1);
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [selectedAddOnName, setSelectedAddOnName] = useState("");
 
   const canteenData = showCanteenBadge ? getCanteenBySlug(item.canteenSlug) : null;
 
   // Determine if sizes are pizza-style (S/M/L) or flavour-style
   const hasSizes = item.sizes !== undefined;
-  const isPizzaSizes = hasSizes && item.sizes && Object.keys(item.sizes).some(
+  const isPizzaSizes = hasSizes && !item.addOns && item.sizes && Object.keys(item.sizes).some(
     (k) => k === "Small" || k === "Medium" || k === "Large",
   );
   const allSamePrice = hasSizes && item.sizes
@@ -37,12 +38,18 @@ export default function FoodCard({ item, showCanteenBadge = false }: FoodCardPro
 
   const imageSrc = item.image ?? getMenuImage(item.name);
   const displaySrc = imgError ? "/menu/placeholder.jpg" : imageSrc;
-  const currentPrice = hasSizes && selectedSize ? item.sizes![selectedSize] : item.price;
+  const selectedAddOn = item.addOns?.find(
+    (addOn) => addOn.name === selectedAddOnName,
+  );
+  const basePrice = hasSizes && selectedSize ? item.sizes![selectedSize] : item.price;
+  const currentPrice = basePrice + (selectedAddOn?.price ?? 0);
   const isOrderingDisabled = !item.available;
   const isDeal = item.id.includes("-deal-");
 
   const handleAdd = () => {
-    const finalId = hasSizes && selectedSize ? item.id + "-" + selectedSize : item.id;
+    const finalId = hasSizes && selectedSize
+      ? item.id + "-" + selectedSize + (selectedAddOn ? "-" + selectedAddOn.name : "")
+      : item.id + (selectedAddOn ? "-" + selectedAddOn.name : "");
     addItem(
       {
         id: finalId,
@@ -52,6 +59,7 @@ export default function FoodCard({ item, showCanteenBadge = false }: FoodCardPro
         canteenName: getCanteenName(item.canteenSlug),
         gradient: item.gradient,
         size: hasSizes && selectedSize ? selectedSize : undefined,
+        selectedAddOns: selectedAddOn ? [selectedAddOn] : undefined,
       },
       qty,
     );
@@ -122,6 +130,40 @@ export default function FoodCard({ item, showCanteenBadge = false }: FoodCardPro
                   }
                 >
                   {label}{priceLabel}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {item.addOns && (
+          <div
+            className="mt-1 flex flex-wrap items-center gap-1"
+            role="radiogroup"
+            aria-label={`${item.name} toppings`}
+          >
+            <span className="mr-1 text-[11px] font-medium text-gray-500">
+              Topping:
+            </span>
+            {[{ name: "None", price: 0 }, ...item.addOns].map((addOn) => {
+              const value = addOn.name === "None" ? "" : addOn.name;
+              const active = selectedAddOnName === value;
+              return (
+                <button
+                  key={addOn.name}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setSelectedAddOnName(value)}
+                  className={
+                    "rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors " +
+                    (active
+                      ? "border-[#6C2BD9] bg-[#6C2BD9] text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-[#6C2BD9]/40")
+                  }
+                >
+                  {addOn.name}
+                  {addOn.price > 0 && ` +Rs. ${addOn.price}`}
                 </button>
               );
             })}

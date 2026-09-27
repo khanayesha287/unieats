@@ -100,7 +100,7 @@ export default function ContactPageContent() {
           <ContactCard
             icon={Camera}
             title="Instagram"
-            description="@unieats_uet"
+            description="@unieats.pk"
             href={INSTAGRAM_URL}
             action="Follow on Instagram"
           />

@@ -1,6 +1,7 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import type { Order } from "@/lib/types";
 import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
+import { formatCartItemName } from "@/lib/cart-utils";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey =
@@ -373,7 +374,7 @@ export async function saveOrderToSupabase(
       const itemsToInsert = group.items.map((item) => ({
         order_id: orderId,
         menu_item_id: normalizeMenuItemId(item.id),
-        item_name: item.name,
+        item_name: formatCartItemName(item),
         quantity: item.quantity,
         price: Number(item.price),
         subtotal: Number(item.price * item.quantity),

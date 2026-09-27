@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { DEPARTMENTS, DELIVERY_ACTUAL, DELIVERY_CHARGED } from "@/lib/constants";
+import { DELIVERY_ACTUAL, DELIVERY_CHARGED } from "@/lib/constants";
 import { formatPrice } from "@/lib/format";
 import {
   buildOrder,
@@ -23,9 +23,7 @@ import type { CheckoutFormData, OrderType } from "@/lib/types";
 
 const initialForm: CheckoutFormData = {
   studentName: "",
-  registrationNumber: "",
   phone: "",
-  department: DEPARTMENTS[0],
   orderType: "pickup",
   deliveryLocation: "",
   specialInstructions: "",
@@ -51,7 +49,6 @@ export default function CheckoutPageContent() {
   const isFormValid = useMemo(() => {
     if (!form.studentName.trim()) return false;
     if (!form.phone.trim()) return false;
-    if (!form.department) return false;
     if (form.orderType === "delivery" && !form.deliveryLocation.trim()) {
       return false;
     }
@@ -68,9 +65,6 @@ export default function CheckoutPageContent() {
       nextErrors.phone = "Phone number is required.";
     } else if (!/^03\d{9}$/.test(form.phone.replace(/\s/g, ""))) {
       nextErrors.phone = "Enter a valid Pakistani phone number (03XXXXXXXXX).";
-    }
-    if (!form.department) {
-      nextErrors.department = "Department is required.";
     }
     if (form.orderType === "delivery" && !form.deliveryLocation.trim()) {
       nextErrors.deliveryLocation = "Delivery location is required.";
@@ -229,51 +223,6 @@ export default function CheckoutPageContent() {
               }
               placeholder="03XXXXXXXXX"
             />
-            <Field
-              id="registrationNumber"
-              label="Registration Number"
-              value={form.registrationNumber}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, registrationNumber: value }))
-              }
-              placeholder="e.g. 2023-BCS-045"
-            />
-            <div>
-              <label
-                htmlFor="department"
-                className="mb-2 block text-sm font-semibold text-gray-700"
-              >
-                Department <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="department"
-                value={form.department}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    department: event.target.value,
-                  }))
-                }
-                className={`w-full rounded-xl border bg-white px-4 py-3 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#6C2BD9]/20 ${
-                  errors.department
-                    ? "border-red-400 focus:border-red-400"
-                    : "border-gray-200 focus:border-[#6C2BD9]"
-                }`}
-                aria-invalid={Boolean(errors.department)}
-                aria-describedby={errors.department ? "department-error" : undefined}
-              >
-                {DEPARTMENTS.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
-                  </option>
-                ))}
-              </select>
-              {errors.department && (
-                <p id="department-error" className="mt-1.5 text-sm text-red-600">
-                  {errors.department}
-                </p>
-              )}
-            </div>
           </div>
 
           <fieldset>
@@ -319,7 +268,7 @@ export default function CheckoutPageContent() {
               onChange={(value) =>
                 setForm((current) => ({ ...current, deliveryLocation: value }))
               }
-              placeholder="Building, Department, Block, etc."
+              placeholder="Building, Hostel, Block, etc."
             />
           )}
 
@@ -364,6 +313,11 @@ export default function CheckoutPageContent() {
                       >
                         <span className="text-gray-700">
                           {item.quantity} × {item.name}{item.size ? ` (${item.size})` : ""}
+                          {item.selectedAddOns?.map((addOn) => (
+                            <span key={addOn.name} className="block text-xs text-gray-500">
+                              {addOn.name} topping (+{formatPrice(addOn.price)})
+                            </span>
+                          ))}
                         </span>
                         <span className="shrink-0 font-semibold text-gray-900">
                           {formatPrice(item.price * item.quantity)}

@@ -2576,6 +2576,23 @@ export const menuItems: MenuItem[] = [
 
   // Hot Potato — Loaded Fries
   {
+    id: "hp-loaded-mac-fries",
+    name: "Mac Fries",
+    description: "Loaded fries topped with macaroni.",
+    price: 350,
+    category: "fast-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "hot-potato",
+    gradient: "from-[#7C3AED]/25 to-[#F4C542]/25",
+    image: "/menu/large-loaded-pasta.jpg",
+    sizes: { Small: 350, Large: 450 },
+    addOns: [
+      { name: "Chicken", price: 50 },
+      { name: "Cheese", price: 50 },
+    ],
+  },
+  {
     id: "hp-loaded-pizza",
     name: "Pizza Fries",
     description: "Fries loaded with pizza sauce, cheese, and toppings.",
@@ -2629,4 +2646,3 @@ export function getMenuByCanteen(slug: string): MenuItem[] {
 export function getMenuItemById(id: string): MenuItem | undefined {
   return menuItems.find((item) => item.id === id);
 }
-

@@ -4,19 +4,12 @@ import Link from "next/link";
 import SscCanteenStatus from "@/components/ui/SscCanteenStatus";
 import { useSscCanteenStatus } from "@/lib/canteen-hours";
 
-const features = [
-  "🚀 Fast Ordering",
-  "🏫 UET Lahore",
-  "🍔 Fresh Food",
-  "🛵 Campus Delivery",
-];
-
 export default function CTA() {
   const { isOpen } = useSscCanteenStatus();
 
   return (
-    <section className="px-4 py-20 sm:px-6 lg:px-8 lg:py-28" aria-labelledby="cta-heading">
-      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#6C2BD9] via-[#7C3AED] to-[#5B21B6] px-6 py-16 text-center text-white shadow-2xl shadow-[#6C2BD9]/30 sm:px-12 sm:py-20">
+    <section className="px-4 py-12 sm:px-6 lg:px-8 lg:py-16" aria-labelledby="cta-heading">
+      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#6C2BD9] via-[#7C3AED] to-[#5B21B6] px-6 py-10 text-center text-white shadow-2xl shadow-[#6C2BD9]/30 sm:px-12 sm:py-12">
         <div
           className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 animate-float rounded-full bg-[#F4C542]/20 blur-3xl"
           aria-hidden
@@ -28,21 +21,24 @@ export default function CTA() {
         />
 
         <div className="relative animate-fade-up">
-          <h2 id="cta-heading" className="text-3xl font-bold sm:text-4xl lg:text-5xl">
+          <h2 id="cta-heading" className="text-2xl font-bold sm:text-3xl lg:text-4xl">
             Hungry? <span className="text-[#F4C542]">Order</span> Before You Leave
             Your Class.
           </h2>
 
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/85">
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-white/85 sm:text-base">
             Browse campus canteen menus, place your order in seconds, and choose Pickup
             or Campus Delivery.
           </p>
 
-          <div className="mt-6 flex justify-center">
-            <SscCanteenStatus className="mx-auto" compact={false} />
+          <div className="mt-4 flex justify-center">
+            <SscCanteenStatus className="mx-auto" compact />
           </div>
+          <p className="mt-1 text-sm text-white/90">
+            Delivery: Monday–Saturday | 9 AM–6 PM
+          </p>
 
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row">
             {isOpen ? (
               <Link
                 href="/canteens"
@@ -57,16 +53,6 @@ export default function CTA() {
             )}
           </div>
 
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
-            {features.map((feature) => (
-              <span
-                key={feature}
-                className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur-sm"
-              >
-                {feature}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
     </section>

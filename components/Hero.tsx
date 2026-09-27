@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function Hero() {
@@ -28,29 +29,34 @@ export default function Hero() {
 
           <h1
             id="hero-heading"
-            className="mt-6 text-4xl font-bold leading-tight tracking-tight text-gray-900 sm:text-5xl lg:text-6xl"
+            className="mt-5 text-3xl font-bold leading-tight tracking-tight text-gray-900 sm:text-4xl lg:text-5xl"
           >
             Skip The Waiting Time
           </h1>
 
-          <p className="mt-6 text-3xl font-bold leading-tight tracking-tight text-[#6C2BD9] sm:text-5xl lg:text-6xl">
+          <p className="mt-3 text-2xl font-bold leading-tight tracking-tight text-[#6C2BD9] sm:text-3xl lg:text-4xl">
             Order While Sitting In Class
           </p>
 
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-600">
-            Uni Eats is making food ordering easy for students, teachers and staff. Order online and get your food delivered to your department, hostel or anywhere on campus. Just order, we’ll deliver.
-          </p>
-
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link
-              href="/canteens"
-              className="rounded-full bg-[#6C2BD9] px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-1 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
-            >
-              Order Food
-            </Link>
+          <div className="relative mt-7 aspect-[16/9] w-full max-w-2xl overflow-hidden rounded-2xl bg-white/70 shadow-xl shadow-[#6C2BD9]/10 ring-1 ring-[#6C2BD9]/10">
+            <Image
+              src="/images/hot-potato-poster.png"
+              alt="Hot Potato Canteen poster"
+              fill
+              priority
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 672px"
+              className="object-contain"
+            />
           </div>
 
-          <div className="mt-10 flex flex-wrap justify-center gap-3">
+          <Link
+            href="/menu/hot-potato"
+            className="mt-5 inline-flex items-center justify-center rounded-full bg-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
+          >
+            Order Now
+          </Link>
+
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             {[
               "⚡ Fast Ordering",
               "🚴 Campus Delivery",

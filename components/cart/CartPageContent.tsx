@@ -83,6 +83,11 @@ export default function CartPageContent() {
                       {item.size && (
                         <p className="mt-0.5 text-sm font-semibold text-gray-500">{item.size}</p>
                       )}
+                      {item.selectedAddOns?.map((addOn) => (
+                        <p key={addOn.name} className="mt-0.5 text-sm text-gray-500">
+                          {addOn.name} topping (+{formatPrice(addOn.price)})
+                        </p>
+                      ))}
                       <p className="mt-0.5 text-sm text-gray-500">{item.canteenName}</p>
                       <p className="mt-2 text-lg font-bold text-[#6C2BD9]">
                         {formatPrice(item.price)}

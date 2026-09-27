@@ -2,7 +2,7 @@ export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://unieats.pk";
 
 
-export const INSTAGRAM_URL = "https://www.instagram.com/unieats_uet";
+export const INSTAGRAM_URL = "https://www.instagram.com/unieats.pk/";
 
 export const CONTACT_EMAIL = "unieats.uet@gmail.com";
 
