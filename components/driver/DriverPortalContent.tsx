@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildStatusUpdatePayload } from "@/lib/supabase";
+import { buildStatusUpdatePayload, supabase } from "@/lib/supabase";
 import { supabaseAuth } from "@/lib/supabase-auth";
 import { useAuth } from "@/components/providers/AuthProvider";
 
@@ -573,14 +573,11 @@ export default function DriverPortalContent() {
                               <p className="mt-1 text-sm font-medium text-slate-800">
                                 {order.student_name}
                               </p>
-<<<<<<< HEAD
-=======
                               {order.department && (
                                 <p className="text-xs text-slate-500">
                                   {order.department}
                                 </p>
                               )}
->>>>>>> origin/main
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-bold text-slate-900">
@@ -631,14 +628,11 @@ export default function DriverPortalContent() {
                                   >
                                     {order.phone}
                                   </a>
-<<<<<<< HEAD
-=======
                                   {order.department && (
                                     <p className="text-xs text-slate-500">
                                       {order.department}
                                     </p>
                                   )}
->>>>>>> origin/main
                                 </div>
                               </div>
 

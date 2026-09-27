@@ -29,26 +29,16 @@ export default function GSCMenuPageContent({ canteenSlug }: GSCMenuPageContentPr
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-<<<<<<< HEAD
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#F4C542]">
             {canteenSlug === "gssc" ? "GSSC Canteen" : "Bhôla Café"}
-=======
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#6C2BD9]">
-            GSSC Canteen
->>>>>>> origin/main
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
             Menu
           </h1>
-<<<<<<< HEAD
           <p className="mt-3 max-w-2xl text-base text-white/80 sm:text-lg">
             {canteenSlug === "gssc"
               ? "Rolls, samosas, snacks, and quick bites for UET students."
               : "Fresh karahi, biryani, shakes, juices, and tang favourites for students."}
-=======
-          <p className="mt-3 max-w-2xl text-base text-gray-600 sm:text-lg">
-            Rolls, samosas, snacks, and quick bites for UET students.
->>>>>>> origin/main
           </p>
         </div>
         <Link

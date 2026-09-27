@@ -1428,11 +1428,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-malai-boti-samosa",
@@ -1444,11 +1440,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-aalo-samosa",
@@ -1460,11 +1452,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-chicken-samosa",
@@ -1476,11 +1464,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-vegetable-roll",
@@ -1492,11 +1476,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-ziger-samosa",
@@ -1521,11 +1501,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-shawarma-roll",
@@ -1537,11 +1513,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-macaroni-samosa",
@@ -1553,11 +1525,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-cheez-samosa",
@@ -1569,11 +1537,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-snacks-seekh-kabab-roll",
@@ -1585,11 +1549,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
 
   // GSSC Canteen — Meals
@@ -1603,11 +1563,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
   {
     id: "gssc-meals-chicken-qeema",
@@ -1619,11 +1575,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "gssc",
     gradient: "from-[#059669]/30 to-[#10B981]/20",
-<<<<<<< HEAD
-    
-=======
     image: "/menu/gssc-menu.png",
->>>>>>> origin/main
   },
 
 

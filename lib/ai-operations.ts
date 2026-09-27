@@ -81,10 +81,7 @@ interface MinimalOrder {
   id: number | string;
   order_number: string;
   student_name: string;
-<<<<<<< HEAD
-=======
   registration_number?: string | null;
->>>>>>> origin/main
   phone?: string | null;
   department?: string | null;
   order_type: string;
