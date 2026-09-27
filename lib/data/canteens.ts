@@ -26,6 +26,7 @@ export const canteens: Canteen[] = [
       "Fresh karahi, desi food, shakes, juices, and refreshing drinks.",
     prepTime: "10–15 min",
     gradient: "from-[#D97706] via-[#F59E0B] to-[#FCD34D]",
+    image: "/bhola-building.jpg.jpeg",
     status: "active",
   },
   {

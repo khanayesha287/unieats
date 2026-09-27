@@ -109,7 +109,7 @@ export default function Footer() {
                     <span className="block font-medium text-white/90">
                       Instagram
                     </span>
-                    @unieats_uet
+                    @unieats.pk
                   </span>
                 </a>
               </li>

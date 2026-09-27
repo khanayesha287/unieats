@@ -19,22 +19,22 @@ export default function CanteensPageContent() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {canteens.map((canteen) => {
           const isActive = canteen.status === "active";
 
           const card = (
             <div
               key={canteen.slug}
-              className={"group flex h-full flex-col overflow-hidden rounded-2xl border border-transparent bg-white shadow-lg shadow-[#6C2BD9]/5 transition-all duration-300 " + (isActive ? "hover:-translate-y-1 hover:border-[#6C2BD9]/20 hover:shadow-xl hover:shadow-[#6C2BD9]/15" : "opacity-80 cursor-not-allowed")}
+              className={"group flex h-full flex-col overflow-hidden rounded-xl border border-transparent bg-white shadow-lg shadow-[#6C2BD9]/5 transition-all duration-300 " + (isActive ? "hover:-translate-y-1 hover:border-[#6C2BD9]/20 hover:shadow-xl hover:shadow-[#6C2BD9]/15" : "opacity-80 cursor-not-allowed")}
             >
-              <div className={"relative h-32 shrink-0 overflow-hidden border-t-4 sm:h-36 " + (isActive ? "border-[#6C2BD9]" : "border-gray-300") + " " + (canteen.image ? "" : "bg-gradient-to-br " + canteen.gradient)}>
+              <div className={"relative h-20 shrink-0 overflow-hidden border-t-4 sm:h-28 " + (isActive ? "border-[#6C2BD9]" : "border-gray-300") + " " + (canteen.image ? "" : "bg-gradient-to-br " + canteen.gradient)}>
                 {canteen.image ? (
                   <Image
                     src={canteen.image}
                     alt={canteen.name}
                     fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 360px"
+                    sizes="(max-width: 640px) 48vw, (max-width: 1024px) 32vw, 320px"
                     className="object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 ) : (
@@ -42,8 +42,8 @@ export default function CanteensPageContent() {
                 )}
               </div>
 
-              <div className="flex flex-1 items-center p-4">
-                <h3 className={"text-xl font-bold text-gray-900 " + (isActive ? "transition-colors group-hover:text-[#6C2BD9]" : "")}>
+              <div className="flex flex-1 items-center p-2 sm:p-3">
+                <h3 className={"whitespace-nowrap text-[13px] font-bold text-gray-900 sm:text-base " + (isActive ? "transition-colors group-hover:text-[#6C2BD9]" : "")}>
                   {canteen.name}
                 </h3>
               </div>

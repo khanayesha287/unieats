@@ -94,13 +94,13 @@ export default function Navbar() {
         role="banner"
       >
         <nav
-          className="mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
+          className="relative mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
           aria-label="Main navigation"
         >
-          {/* Logo */}
+          {/* Centered logo */}
           <Link
             href="/"
-            className="group flex items-center gap-3 transition-opacity hover:opacity-90"
+            className="group absolute left-1/2 z-10 flex max-w-[calc(100%-4.5rem)] -translate-x-1/2 items-center gap-2 transition-opacity hover:opacity-90 sm:gap-3"
             aria-label="UniEats home"
           >
             <Image
@@ -108,21 +108,21 @@ export default function Navbar() {
               alt="UniEats logo"
               width={44}
               height={44}
-              className="h-11 w-11 rounded-xl object-cover shadow-sm"
+              className="h-9 w-9 shrink-0 rounded-xl object-cover shadow-sm sm:h-11 sm:w-11"
               priority
             />
-            <div className="hidden sm:block">
-              <p className={`text-lg font-bold tracking-tight transition-colors ${
+            <div className="min-w-0 text-left">
+              <p className={`text-base font-bold tracking-tight transition-colors sm:text-lg ${
                 scrolled ? "text-[#6C2BD9]" : "text-white"
               }`}>UniEats</p>
-              <p className={`text-[10px] font-medium uppercase tracking-[0.2em] ${
+              <p className={`whitespace-nowrap text-[7px] font-medium uppercase tracking-[0.12em] sm:text-[10px] sm:tracking-[0.2em] ${
                 scrolled ? "text-gray-500" : "text-white/80"
               }`}>ORDER | PICKUP | ENJOY</p>
             </div>
           </Link>
 
           {/* Desktop nav links */}
-          <ul className="hidden items-center gap-8 md:flex" role="list">
+          <ul className="mr-auto hidden items-center gap-3 md:flex lg:gap-6" role="list">
             {customerLinks.map((link) => {
               const active = isNavActive(link.href, pathname);
               return (
@@ -143,7 +143,7 @@ export default function Navbar() {
           </ul>
 
           {/* Desktop right section */}
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="ml-auto hidden items-center gap-3 md:flex">
             {/* Three-dot More menu */}
             <div className="relative" ref={moreRef}>
               <button
@@ -240,7 +240,7 @@ export default function Navbar() {
           {/* Mobile hamburger */}
           <button
             type="button"
-            className={`relative z-50 flex h-10 w-10 items-center justify-center rounded-xl md:hidden ${
+            className={`relative z-50 ml-auto flex h-10 w-10 items-center justify-center rounded-xl md:ml-0 md:hidden ${
               scrolled || menuOpen ? "text-[#6C2BD9]" : "text-white"
             }`}
             onClick={() => setMenuOpen((prev) => !prev)}
