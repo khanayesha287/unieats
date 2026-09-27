@@ -5,16 +5,16 @@ import { createClient } from "@supabase/supabase-js";
 type ServerSupabaseClient = ReturnType<typeof createClient<any>>;
 import {
   formatWhatsAppOrderNotification,
-  formatWhatsAppStatusNotification,
   sendWhatsAppOrderNotification,
 } from "@/lib/whatsapp-server";
 
 type NotificationStatus = "pending" | "processing" | "failed" | "sent";
+const MAX_NOTIFICATION_BATCH_SIZE = 25;
 
 type NotificationRecord = {
   id: string;
   order_id: string;
-  event_type: string;
+  event_type: "order_created";
   recipient_phone?: string | null;
   status: NotificationStatus;
   attempt_count: number;
@@ -66,7 +66,7 @@ async function claimNotification(
   notification: NotificationRecord,
 ): Promise<NotificationRecord | null> {
   const { data, error } = await client
-    .from("whatsapp_order_notifications")
+    .from("whatsapp_order_notification_queue")
     .update({
       status: "processing",
       attempt_count: notification.attempt_count + 1,
@@ -93,7 +93,7 @@ async function markFailed(
 ): Promise<void> {
   const message = safeErrorMessage(error);
   const { error: updateError } = await client
-    .from("whatsapp_order_notifications")
+    .from("whatsapp_order_notification_queue")
     .update({
       status: "failed",
       locked_at: null,
@@ -144,45 +144,27 @@ async function processOne(
       throw new Error("The confirmed order has no saved items.");
     }
 
-    const message = notification.event_type === "order_created"
-      ? formatWhatsAppOrderNotification(
-          {
-            id: notification.order_id,
-            order_number: String(order.order_number ?? notification.order_id),
-            student_name: String(order.student_name ?? ""),
-            registration_number: order.registration_number ?? null,
-            phone: String(order.phone ?? ""),
-            department: order.department ?? null,
-            order_type: String(order.order_type ?? "pickup"),
-            delivery_location: order.delivery_location ?? null,
-            total_amount: Number(order.total_amount ?? 0),
-            payment_method: order.payment_method ?? null,
-            created_at: order.created_at ?? null,
-          },
-          String(canteen.name ?? "Unknown canteen"),
-          items,
-        )
-      : formatWhatsAppStatusNotification(
-          notification.event_type,
-          {
-            id: notification.order_id,
-            order_number: String(order.order_number ?? notification.order_id),
-            student_name: String(order.student_name ?? ""),
-            phone: String(order.phone ?? ""),
-            order_type: String(order.order_type ?? "pickup"),
-            delivery_location: order.delivery_location ?? null,
-            total_amount: Number(order.total_amount ?? 0),
-            created_at: order.created_at ?? null,
-          },
-          String(canteen.name ?? "Unknown canteen"),
-        );
-    const result = await sendWhatsAppOrderNotification(
-      message,
-      String(notification.recipient_phone ?? order.phone ?? ""),
+    const message = formatWhatsAppOrderNotification(
+      {
+        id: notification.order_id,
+        order_number: String(order.order_number ?? notification.order_id),
+        student_name: String(order.student_name ?? ""),
+        registration_number: order.registration_number ?? null,
+        phone: String(order.phone ?? ""),
+        department: order.department ?? null,
+        order_type: String(order.order_type ?? "pickup"),
+        delivery_location: order.delivery_location ?? null,
+        total_amount: Number(order.total_amount ?? 0),
+        payment_method: order.payment_method ?? null,
+        created_at: order.created_at ?? null,
+      },
+      String(canteen.name ?? "Unknown canteen"),
+      items,
     );
+    const result = await sendWhatsAppOrderNotification(message);
 
     const { error: sentError } = await client
-      .from("whatsapp_order_notifications")
+      .from("whatsapp_order_notification_queue")
       .update({
         status: "sent",
         provider_message_id: result.providerMessageId,
@@ -206,37 +188,20 @@ async function processOne(
   }
 }
 
-export async function processWhatsAppOrderNotifications(
-  orderIds: string[],
-  options: ProcessOptions = {},
+async function processNotifications(
+  client: ServerSupabaseClient,
+  notifications: NotificationRecord[],
+  requested: number,
 ): Promise<NotificationProcessResult> {
-  const normalizedIds = normalizeOrderIds(orderIds);
-  const client = getServerSupabase();
   const result: NotificationProcessResult = {
-    requested: normalizedIds.length,
+    requested,
     claimed: 0,
     sent: 0,
     failed: 0,
     skipped: 0,
   };
 
-  if (!client || normalizedIds.length === 0) return result;
-
-  let query = client
-    .from("whatsapp_order_notifications")
-    .select("id, order_id, event_type, recipient_phone, status, attempt_count")
-    .in("order_id", normalizedIds);
-  query = options.includeFailed
-    ? query.in("status", ["pending", "failed"])
-    : query.eq("status", "pending");
-
-  const { data: notifications, error } = await query;
-  if (error) {
-    console.error("[UniEats WhatsApp] Notification queue query failed:", error.message);
-    return result;
-  }
-
-  for (const row of (notifications ?? []) as NotificationRecord[]) {
+  for (const row of notifications) {
     const claimed = await claimNotification(client, row);
     if (!claimed) {
       result.skipped += 1;
@@ -251,6 +216,76 @@ export async function processWhatsAppOrderNotifications(
     }
   }
 
-  result.skipped += Math.max(0, normalizedIds.length - result.claimed - result.failed - result.sent);
+  result.skipped += Math.max(0, requested - result.claimed - result.failed - result.sent);
   return result;
+}
+
+export async function processWhatsAppOrderNotifications(
+  orderIds: string[],
+  options: ProcessOptions = {},
+): Promise<NotificationProcessResult> {
+  const normalizedIds = normalizeOrderIds(orderIds);
+  const client = getServerSupabase();
+  const emptyResult: NotificationProcessResult = {
+    requested: normalizedIds.length,
+    claimed: 0,
+    sent: 0,
+    failed: 0,
+    skipped: normalizedIds.length,
+  };
+
+  if (!client || normalizedIds.length === 0) return emptyResult;
+
+  let query = client
+    .from("whatsapp_order_notification_queue")
+    .select("id, order_id, event_type, recipient_phone, status, attempt_count")
+    .eq("event_type", "order_created")
+    .in("order_id", normalizedIds);
+  query = options.includeFailed
+    ? query.in("status", ["pending", "failed"])
+    : query.eq("status", "pending");
+
+  const { data: notifications, error } = await query;
+  if (error) {
+    console.error("[UniEats WhatsApp] Notification queue query failed:", error.message);
+    return emptyResult;
+  }
+
+  return processNotifications(
+    client,
+    (notifications ?? []) as NotificationRecord[],
+    normalizedIds.length,
+  );
+}
+
+export async function processPendingWhatsAppOrderNotifications(): Promise<NotificationProcessResult> {
+  const client = getServerSupabase();
+  const emptyResult: NotificationProcessResult = {
+    requested: 0,
+    claimed: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+  };
+
+  if (!client) {
+    console.error("[UniEats WhatsApp] Queue processor is not configured: Supabase server credentials are missing.");
+    throw new Error("WhatsApp queue processor is not configured.");
+  }
+
+  const { data: notifications, error } = await client
+    .from("whatsapp_order_notification_queue")
+    .select("id, order_id, event_type, recipient_phone, status, attempt_count")
+    .eq("event_type", "order_created")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+    .limit(MAX_NOTIFICATION_BATCH_SIZE);
+
+  if (error) {
+    console.error("[UniEats WhatsApp] Pending queue query failed:", error.message);
+    throw new Error("Unable to load pending WhatsApp notifications.");
+  }
+
+  const rows = (notifications ?? []) as NotificationRecord[];
+  return processNotifications(client, rows, rows.length);
 }

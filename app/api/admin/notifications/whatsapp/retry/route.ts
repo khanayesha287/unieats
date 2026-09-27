@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   const { supabase, response } = await requireAdmin(request);
   if (response) return response;
   const { data, error } = await supabase!
-    .from("whatsapp_order_notifications")
+    .from("whatsapp_order_notification_queue")
     .select("order_id, event_type, status, last_error, updated_at, attempt_count")
     .order("updated_at", { ascending: false })
     .limit(500);
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
   if (orderIds.length === 0) {
     const { data, error } = await supabase!
-      .from("whatsapp_order_notifications")
+      .from("whatsapp_order_notification_queue")
       .select("order_id")
       .eq("status", "failed")
       .order("updated_at", { ascending: true })

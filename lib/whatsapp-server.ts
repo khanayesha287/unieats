@@ -108,13 +108,22 @@ export function formatWhatsAppOrderNotification(
 function getWhatsAppConfig() {
   const apiToken = process.env.WHATSAPP_CLOUD_API_TOKEN?.trim();
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  const recipientPhone = process.env.WHATSAPP_RECIPIENT_PHONE?.trim();
   const apiVersion = process.env.WHATSAPP_CLOUD_API_VERSION?.trim() || "v23.0";
 
-  if (!apiToken || !phoneNumberId) {
-    throw new Error("WhatsApp Cloud API is not configured on the server.");
+  const missingVariables = [
+    !apiToken && "WHATSAPP_CLOUD_API_TOKEN",
+    !phoneNumberId && "WHATSAPP_PHONE_NUMBER_ID",
+    !recipientPhone && "WHATSAPP_RECIPIENT_PHONE",
+  ].filter((variable): variable is string => Boolean(variable));
+
+  if (!apiToken || !phoneNumberId || !recipientPhone) {
+    throw new Error(
+      `WhatsApp Cloud API is not configured on the server. Missing required environment variable(s): ${missingVariables.join(", ")}.`,
+    );
   }
 
-  return { apiToken, phoneNumberId, apiVersion };
+  return { apiToken, phoneNumberId, recipientPhone, apiVersion };
 }
 
 function safeProviderError(payload: unknown): string {
@@ -129,16 +138,13 @@ function normalizeRecipientNumber(value: string): string {
   const digits = value.replace(/\D/g, "");
   const normalized = digits.startsWith("0") ? `92${digits.slice(1)}` : digits;
   if (!/^\d{8,15}$/.test(normalized)) {
-    throw new Error("The order phone number is not a valid WhatsApp recipient.");
+    throw new Error("WHATSAPP_RECIPIENT_PHONE must be a valid WhatsApp recipient number.");
   }
   return normalized;
 }
 
-export async function sendWhatsAppOrderNotification(
-  message: string,
-  recipientPhone: string,
-): Promise<WhatsAppSendResult> {
-  const { apiToken, phoneNumberId, apiVersion } = getWhatsAppConfig();
+export async function sendWhatsAppOrderNotification(message: string): Promise<WhatsAppSendResult> {
+  const { apiToken, phoneNumberId, recipientPhone, apiVersion } = getWhatsAppConfig();
   const recipientNumber = normalizeRecipientNumber(recipientPhone);
   const response = await fetch(
     `https://graph.facebook.com/${encodeURIComponent(apiVersion)}/${encodeURIComponent(phoneNumberId)}/messages`,
