@@ -138,6 +138,12 @@ export default function CheckoutPageContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderIds: savedOrder.orderIds.map(String) }),
       keepalive: true,
+    }).then((response) => {
+      if (!response.ok) {
+        console.warn(
+          `[UniEats] WhatsApp notification dispatch failed with status ${response.status}.`,
+        );
+      }
     }).catch((error) => {
       console.warn("[UniEats] WhatsApp notification dispatch could not start:", error);
     });
