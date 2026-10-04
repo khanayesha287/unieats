@@ -133,20 +133,22 @@ export default function CheckoutPageContent() {
 
     // The database trigger creates durable pending notification records. This request
     // only asks the server to process them; notification failure never blocks checkout.
-    void fetch("/api/notifications/whatsapp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderIds: savedOrder.orderIds.map(String) }),
-      keepalive: true,
-    }).then((response) => {
-      if (!response.ok) {
+    try {
+      const notificationResponse = await fetch("/api/notifications/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: savedOrder.orderIds.map(String) }),
+        keepalive: true,
+      });
+
+      if (!notificationResponse.ok) {
         console.warn(
-          `[UniEats] WhatsApp notification dispatch failed with status ${response.status}.`,
+          `[UniEats] WhatsApp notification dispatch failed with status ${notificationResponse.status}.`,
         );
       }
-    }).catch((error) => {
+    } catch (error) {
       console.warn("[UniEats] WhatsApp notification dispatch could not start:", error);
-    });
+    }
 
     clearCart();
     router.push("/order-success");
