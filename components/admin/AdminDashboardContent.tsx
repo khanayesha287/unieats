@@ -79,6 +79,12 @@ function formatCurrency(value: number): string {
   }).format(value ?? 0);
 }
 
+function formatCompactCurrency(value: number): string {
+  return `Rs.${new Intl.NumberFormat("en-PK", {
+    maximumFractionDigits: 0,
+  }).format(value ?? 0)}`;
+}
+
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
@@ -87,6 +93,22 @@ function formatDate(value?: string | null): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatCompactOrderDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date);
+  const year = date.getFullYear();
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const suffix = hours >= 12 ? "PM" : "AM";
+  const hour12 = ((hours + 11) % 12) + 1;
+
+  return `${day}-${month}-${year}, ${hour12}:${minutes} ${suffix}`;
 }
 
 function normalizeStatus(value: string | null | undefined): OrderStatus {
@@ -511,6 +533,18 @@ export default function AdminDashboardContent() {
   );
 
   const selectedItems = selectedOrder ? itemsByOrderId[String(selectedOrder.id)] ?? [] : [];
+  const selectedDeliveryCharge = Number(selectedOrder?.delivery_charge ?? 0);
+  const selectedSubtotal = selectedItems.length > 0
+    ? selectedItems.reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0)
+    : Math.max(
+        0,
+        Number(selectedOrder?.total_amount ?? 0) - selectedDeliveryCharge,
+      );
+  const selectedItemSummary = selectedItems.length > 0
+    ? selectedItems
+        .map((item) => `${item.item_name} ×${item.quantity}`)
+        .join(", ")
+    : "No items recorded";
   const selectedCanteenName =
     selectedOrder && selectedOrder.canteen_id !== null && selectedOrder.canteen_id !== undefined
       ? canteenMap[String(selectedOrder.canteen_id)]?.name ?? "Unknown canteen"
@@ -775,159 +809,57 @@ export default function AdminDashboardContent() {
 
           <aside className="rounded-3xl border border-slate-200 bg-white shadow-sm">
             {selectedOrder ? (
-              <div className="p-5">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Order detail
-                    </p>
-                    <h2 className="mt-1 text-xl font-bold text-slate-900">
-                      #{selectedOrder.order_number}
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="space-y-4 text-sm text-slate-700">
-                  <div>
-                    <p className="text-slate-500">Student</p>
-                    <p className="font-semibold text-slate-900">{selectedOrder.student_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Phone</p>
-                    <p className="font-semibold text-slate-900">{selectedOrder.phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Department</p>
-                    <p className="font-semibold text-slate-900">{selectedOrder.department ?? "\u2014"}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Registration No.</p>
-                    <p className="font-semibold text-slate-900">{selectedOrder.registration_number ?? "\u2014"}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Payment Method</p>
-                    <p className="font-semibold text-slate-900">
-                      {selectedOrder.payment_method === "cod"
-                        ? "Cash on Delivery"
-                        : selectedOrder.payment_method === "online"
-                          ? "Online Payment"
-                          : selectedOrder.payment_method ?? "\u2014"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Canteen</p>
-                    <p className="font-semibold text-slate-900">{selectedCanteenName}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Type</p>
-                    <p className="font-semibold capitalize text-slate-900">
-                      {selectedOrder.order_type}
-                    </p>
-                  </div>
-                  {selectedOrder.delivery_location && (
+              <div className="p-4">
+                <h2 className="text-sm font-bold text-violet-700">New UniEats Order</h2>
+                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <dl className="space-y-1 text-xs leading-5 text-slate-700">
                     <div>
-                      <p className="text-slate-500">Delivery location</p>
-                      <p className="font-semibold text-slate-900">{selectedOrder.delivery_location}</p>
+                      <dt className="inline font-semibold text-slate-900">Time: </dt>
+                      <dd className="inline">{formatCompactOrderDate(selectedOrder.created_at)}</dd>
                     </div>
-                  )}
-                  <div>
-                    <p className="text-slate-500">Order time</p>
-                    <p className="font-semibold text-slate-900">{formatDate(selectedOrder.created_at)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">WhatsApp notifications</p>
-                    <div className="mt-1 space-y-1">
-                      {(notificationByOrder[String(selectedOrder.id)] ?? []).map((notification) => (
-                        <p key={`${notification.order_id}-${notification.event_type}`} className={`text-xs font-semibold ${notification.status === "failed" ? "text-red-600" : notification.status === "sent" ? "text-emerald-600" : "text-amber-600"}`}>
-                          {notification.event_type.replace(/_/g, " ")}: {notification.status}
-                        </p>
-                      ))}
-                      {(notificationByOrder[String(selectedOrder.id)] ?? []).some((item) => item.status === "failed") && (
-                        <button type="button" onClick={() => void retrySelectedNotification()} disabled={retryingNotification} className="mt-2 rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
-                          {retryingNotification ? "Retrying…" : "Retry failed notifications"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Status
-                    </label>
-                    <select
-                      value={selectedOrder.status}
-                      onChange={(event) =>
-                        void updateOrderStatus(selectedOrder.id, event.target.value as OrderStatus)
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 focus:border-violet-500 focus:outline-none"
-                      disabled={isUpdating}
-                    >
-                      {ORDER_STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                          {status.replace(/_/g, " ")}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {selectedOrder.order_type === "delivery" && drivers.length > 0 && (
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Driver
-                      </label>
-                      <select
-                        value={selectedOrder.driver_id ? String(selectedOrder.driver_id) : ""}
-                        onChange={(event) =>
-                          void updateOrderDriver(selectedOrder.id, event.target.value)
-                        }
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 focus:border-violet-500 focus:outline-none"
-                      >
-                        <option value="">Unassigned</option>
-                        {drivers.map((driver) => (
-                          <option key={String(driver.id)} value={String(driver.id)}>
-                            {driver.name ?? `Driver ${driver.id}`}
-                          </option>
-                        ))}
-                      </select>
+                      <dt className="inline font-semibold text-slate-900">Student: </dt>
+                      <dd className="inline">{selectedOrder.student_name}</dd>
                     </div>
-                  )}
-
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
-                      <span>Delivery charge</span>
-                      <span>{formatCurrency(Number(selectedOrder.delivery_charge ?? 0))}</span>
+                    <div>
+                      <dt className="inline font-semibold text-slate-900">Phone: </dt>
+                      <dd className="inline">{selectedOrder.phone || "—"}</dd>
                     </div>
-                    {selectedOrder.discount !== null && selectedOrder.discount !== undefined && Number(selectedOrder.discount) > 0 && (
-                      <div className="mb-2 flex items-center justify-between text-sm text-emerald-600">
-                        <span>Discount</span>
-                        <span>-{formatCurrency(Number(selectedOrder.discount))}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-base font-bold text-slate-900">
-                      <span>Total</span>
-                      <span>{formatCurrency(Number(selectedOrder.total_amount ?? 0))}</span>
+                    <div>
+                      <dt className="inline font-semibold text-slate-900">Delivery: </dt>
+                      <dd className="inline">
+                        {selectedOrder.delivery_location || "Delivery Location"}
+                      </dd>
                     </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Ordered items
-                    </p>
-                    <div className="space-y-2">
-                      {(selectedItems.length > 0 ? selectedItems : []).map((item) => (
-                        <div key={String(item.id)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="font-medium text-slate-900">{item.item_name}</span>
-                            <span className="text-xs text-slate-500">Qty: {item.quantity}</span>
-                          </div>
-                          <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
-                            <span>{formatCurrency(Number(item.price ?? 0))} each</span>
-                            <span>{formatCurrency(Number(item.subtotal ?? 0))}</span>
-                          </div>
-                        </div>
-                      ))}
+                    <div>
+                      <dt className="inline font-semibold text-slate-900">Canteen: </dt>
+                      <dd className="inline">{selectedCanteenName}</dd>
                     </div>
-                  </div>
+                    <div>
+                      <dt className="inline font-semibold text-slate-900">Items: </dt>
+                      <dd className="inline">{selectedItemSummary}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-semibold text-slate-900">Subtotal: </dt>
+                      <dd className="inline">{formatCompactCurrency(selectedSubtotal)}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-semibold text-slate-900">
+                        Delivery Charges:{" "}
+                      </dt>
+                      <dd className="inline">
+                        {selectedDeliveryCharge > 0
+                          ? formatCompactCurrency(selectedDeliveryCharge)
+                          : "Free"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-semibold text-slate-900">Total: </dt>
+                      <dd className="inline">
+                        {formatCompactCurrency(Number(selectedOrder.total_amount ?? 0))}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
               </div>
             ) : (
