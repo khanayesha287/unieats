@@ -6,9 +6,7 @@ export const INSTAGRAM_URL = "https://www.instagram.com/unieats.pk/";
 
 export const CONTACT_EMAIL = "unieats.uet@gmail.com";
 
-export const DELIVERY_FEE_PER_CANTEEN = 25;
-export const DELIVERY_ACTUAL = 50;
-export const DELIVERY_CHARGED = 25;
+export const DELIVERY_FEE_PER_CANTEEN = 45;
 
 export const DEPARTMENTS = [
   "Computer Science",

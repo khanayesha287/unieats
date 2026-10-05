@@ -35,7 +35,7 @@ const sections = [
     content: null,
     bullets: [
       "Delivery is available within supported areas of the UET Lahore Main Campus.",
-      "A delivery charge applies per order, regardless of the number of food items ordered.",
+      "A delivery charge of Rs. 45 applies for each canteen in a delivery order.",
       "Delivery can be made to a suitable department, hostel, or other supported campus location.",
       "Delivery time may vary depending on the number of orders, food preparation time, and delivery conditions.",
       "Users should provide an accurate delivery location to avoid delays.",

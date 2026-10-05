@@ -44,8 +44,8 @@ const menuImageMap: Record<string, string> = {
   // Desi Food & Chai Paratha
   "Chicken Biryani": "/menu/chicken-biryani.jpg.png",
   "Chicken Karahi": "/menu/chicken-karahi.jpg.png",
-  "Special Chai": "/menu/chai-paratha-category.jpg.png",
-  "Sada Paratha": "/menu/chai-paratha-category.jpg.png",
+  "Special Chai": "/images/chai.jpg.png",
+  "Sada Paratha": "/images/paratha.jpg.png",
   // Pizza Fallback
   "Chicken Tikka Pizza": "/menu/pizza.jpg.png",
   "Chicken Fajita Pizza": "/menu/pizza.jpg.png",
@@ -68,10 +68,10 @@ const menuImageMap: Record<string, string> = {
   "Cheese Sandwich": "/menu/chicken-sandwich.jpg",
   "Omelette Cheese Sandwich": "/menu/club-sandwich.jpg",
   "Chicken Cheese Sandwich": "/menu/club-sandwich.jpg",
-  "Karak Chai": "/menu/chai-paratha-category.jpg.png",
-  "Masala Chai": "/menu/chai-paratha-category.jpg.png",
-  "Cardimum Tea": "/menu/chai-paratha-category.jpg.png",
-  "Pure Green Tea": "/menu/chai-paratha-category.jpg.png",
+  "Karak Chai": "/images/chai.jpg.png",
+  "Masala Chai": "/images/chai.jpg.png",
+  "Elaichi Chai": "/images/chai.jpg.png",
+  "Pure Green Tea": "/images/jasmine-tea.jpg.png",
   "Regular Fries": "/menu/small-fries.jpg",
   "Malai Boti Samosa": "/menu/gssc-menu.png",
   "Kabab Roll": "/menu/kabab-paratha-roll.jpg",
@@ -87,6 +87,10 @@ export function getMenuImage(name: string): string {
   const normalized = name.trim().toLowerCase();
 
   if (name in menuImageMap) return menuImageMap[name];
+  if (normalized === "aloo palak") return "/images/aloo-palak.jpg.png";
+  if (normalized.includes("channay")) return "/images/channay.jpg.png";
+  if (normalized === "chicken pulao") return "/images/chicken-pulao.jpg.png";
+  if (normalized === "daal chawal") return "/images/daal-chawal.jpg.png";
   if (normalized.includes("biryani")) return "/menu/chicken-biryani.jpg.png";
   if (normalized.includes("karahi")) return "/menu/chicken-karahi.jpg.png";
   if (normalized.includes("qorma")) return "/menu/desi-food-category.jpg.png";
@@ -94,7 +98,9 @@ export function getMenuImage(name: string): string {
   if (normalized.includes("daal") || normalized.includes("chana") || normalized.includes("masser")) return "/menu/desi-food-category.jpg.png";
   if (normalized.includes("shake")) return "/menu/shakes-juices-category.jpg.png";
   if (normalized.includes("juice") || normalized.includes("tang") || normalized.includes("soda")) return "/menu/shakes-juices-category.jpg.png";
-  if (normalized.includes("paratha") || normalized.includes("chai")) return "/menu/chai-paratha-category.jpg.png";
+  if (normalized.includes("paratha")) return "/images/paratha.jpg.png";
+  if (normalized.includes("tea")) return "/images/jasmine-tea.jpg.png";
+  if (normalized.includes("chai")) return "/images/chai.jpg.png";
   if (normalized.includes("samosa") || normalized.includes("roll")) return "/menu/fast-food-category.jpg.png";
   if (normalized.includes("pizza")) return "/menu/pizza.jpg.png";
   if (normalized.includes("burger") || normalized.includes("zinger")) return "/menu/zinger-burger.jpg";
@@ -374,7 +380,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "ssc-fast-fries-small",
-    name: "Small Fries",
+    name: "Small Loaded Fries",
     description: "Crispy fries for a quick snack.",
     price: 400,
     category: "fast-food",
@@ -386,7 +392,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "ssc-fast-fries-large",
-    name: "Large Fries",
+    name: "Large Loaded Fries",
     description: "A big serving of crispy loaded fries.",
     price: 550,
     category: "fast-food",
@@ -1041,7 +1047,7 @@ export const menuItems: MenuItem[] = [
     id: "ssc-desi-biryani-plate",
     name: "Chicken Biryani",
     description: "Fragrant basmati rice cooked with spiced chicken — single plate serving.",
-    price: 220,
+    price: 230,
     category: "desi-food",
     rating: 5,
     available: true,
@@ -1058,6 +1064,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/daal-chawal.jpg.png",
   },
   {
     id: "ssc-desi-bhindi-gosht",
@@ -1069,6 +1076,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-karri-pakora",
@@ -1080,6 +1088,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-daal-mash",
@@ -1135,6 +1144,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/channay.jpg.png",
   },
   {
     id: "ssc-desi-chicken-kabab",
@@ -1146,6 +1156,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/channay.jpg.png",
   },
   {
     id: "ssc-desi-shahi-daal",
@@ -1168,6 +1179,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-aloo-keema",
@@ -1179,6 +1191,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-chicken-kaleji",
@@ -1190,6 +1203,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-aloo-palak",
@@ -1201,6 +1215,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-chicken-palak",
@@ -1212,6 +1227,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-sabzi-sada",
@@ -1223,6 +1239,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-chicken-sabzi",
@@ -1234,12 +1251,24 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
   {
     id: "ssc-desi-chicken-pulao",
     name: "Chicken Pulao",
     description: "Aromatic long-grain rice cooked with tender chicken pieces.",
-    price: 220,
+    price: 230,
+    category: "desi-food",
+    rating: 5,
+    available: true,
+    canteenSlug: "ssc",
+    gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+  },
+  {
+    id: "ssc-desi-daal-chawal",
+    name: "Daal Chawal",
+    description: "Comforting lentils served with steamed rice for a satisfying meal.",
+    price: 170,
     category: "desi-food",
     rating: 5,
     available: true,
@@ -1256,6 +1285,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#5B21B6]/20 to-[#6C2BD9]/15",
+    image: "/images/aloo-palak.jpg.png",
   },
 
   // Chai & Paratha Category
@@ -1269,7 +1299,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#7C3AED]/25 to-[#F4C542]/25",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/chai.jpg.png",
   },
   {
     id: "ssc-paratha-sada",
@@ -1281,7 +1311,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#F4C542]/25 to-[#7C3AED]/25",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/paratha.jpg.png",
   },
   {
     id: "ssc-paratha-aloo",
@@ -1293,7 +1323,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#F4C542]/25 to-[#7C3AED]/25",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/paratha.jpg.png",
   },
   {
     id: "ssc-paratha-chicken",
@@ -1305,7 +1335,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#F4C542]/25 to-[#7C3AED]/25",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/paratha.jpg.png",
   },
   {
     id: "ssc-paratha-chicken-cheese",
@@ -1317,7 +1347,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "ssc",
     gradient: "from-[#F4C542]/25 to-[#7C3AED]/25",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/paratha.jpg.png",
   },
   {
     id: "ssc-egg-simple",
@@ -1651,7 +1681,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-desi-chicken-shami-pulao",
     name: "Chicken Shami Pulao",
     description: "Aromatic chicken pulao with a savoury shami-style flavour.",
-    price: 220,
+    price: 320,
     category: "desi-food",
     menuSection: "desi-food",
     rating: 5,
@@ -1876,7 +1906,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-drink-lemon-soda",
     name: "Lemon Soda",
     description: "Sparkling lemon soda served chilled.",
-    price: 99,
+    price: 110,
     category: "shakes-and-juices",
     menuSection: "tang-and-drinks",
     rating: 5,
@@ -1951,7 +1981,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-main-chicken-shami-pulao",
     name: "Chicken Shami Pulao",
     description: "Tender chicken shami pulao with fragrant rice and spices.",
-    price: 220,
+    price: 320,
     category: "desi-food",
     rating: 5,
     available: true,
@@ -2011,7 +2041,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-juice-banana-shake",
     name: "Banana Shake",
     description: "Creamy banana shake made fresh and cold.",
-    price: 120,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2023,7 +2053,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-juice-mango-shake",
     name: "Mango Shake",
     description: "Refreshing mango shake with a rich tropical taste.",
-    price: 120,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2047,7 +2077,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-juice-oreo-shake",
     name: "Oreo Shake",
     description: "An indulgent Oreo shake for a sweet break.",
-    price: 120,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2059,7 +2089,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-juice-coffee-shake",
     name: "Coffee Shake",
     description: "Cold coffee shake blended to a smooth finish.",
-    price: 130,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2071,7 +2101,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-juice-chocolate-shake",
     name: "Chocolate Shake",
     description: "Creamy chocolate shake with a smooth, rich finish.",
-    price: 130,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2083,7 +2113,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-juice-coffee-crunch-shake",
     name: "Coffee Crunch Shake",
     description: "A crunchy coffee shake with a comforting blend of sweetness and coffee.",
-    price: 150,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2107,7 +2137,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-juice-peach-shake",
     name: "Peach Shake",
     description: "Peach shake with a smooth refreshing taste.",
-    price: 120,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2155,7 +2185,7 @@ export const menuItems: MenuItem[] = [
     id: "bhola-drink-lemon-soda",
     name: "Lemon Soda",
     description: "Cool lemon soda with a fizzy, refreshing finish.",
-    price: 99,
+    price: 110,
     category: "drinks",
     rating: 5,
     available: true,
@@ -2167,7 +2197,7 @@ export const menuItems: MenuItem[] = [
     id: "annexe-shake-panga",
     name: "Panga",
     description: "The iconic Panga — rich, indulgent, and unforgettable. Choose your flavour.",
-    price: 250,
+    price: 270,
     category: "shakes-and-juices",
     rating: 5,
     available: true,
@@ -2175,12 +2205,12 @@ export const menuItems: MenuItem[] = [
     gradient: "from-[#DC2626]/30 to-[#F59E0B]/25",
     image: "/menu/mango-shake.jpg",
     sizes: {
-      "Mango": 250,
-      "Banana": 250,
-      "Khajoor": 250,
-      "Strawberry": 250,
-      "Coffee": 250,
-      "Chocolate": 250,
+      "Mango": 270,
+      "Banana": 270,
+      "Khajoor": 270,
+      "Strawberry": 270,
+      "Coffee": 270,
+      "Chocolate": 270,
     },
   },
   {
@@ -2280,7 +2310,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#7C3AED]/20 to-[#F4C542]/20",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/chai.jpg.png",
   },
   {
     id: "hp-tea-masala",
@@ -2292,11 +2322,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#7C3AED]/20 to-[#F4C542]/20",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/chai.jpg.png",
   },
   {
     id: "hp-tea-cardimum",
-    name: "Cardimum Tea",
+    name: "Elaichi Chai",
     description: "Rich cardamom-infused tea with a fragrant finish.",
     price: 80,
     category: "tea",
@@ -2304,7 +2334,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#7C3AED]/20 to-[#F4C542]/20",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/chai.jpg.png",
   },
 
   // Hot Potato — Green Tea
@@ -2318,7 +2348,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#22C55E]/20 to-[#7C3AED]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
   {
     id: "hp-greentea-strawberry",
@@ -2330,7 +2360,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#EC4899]/20 to-[#7C3AED]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
   {
     id: "hp-greentea-jasmine",
@@ -2342,7 +2372,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#F4C542]/20 to-[#7C3AED]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
   {
     id: "hp-greentea-tropical-peach",
@@ -2354,7 +2384,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#F59E0B]/20 to-[#7C3AED]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
   {
     id: "hp-greentea-lemongrass",
@@ -2366,7 +2396,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#A3E635]/20 to-[#7C3AED]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
   {
     id: "hp-greentea-honey-ginger",
@@ -2378,11 +2408,11 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#D97706]/20 to-[#7C3AED]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
   {
     id: "hp-greentea-cardium",
-    name: "Cardium Tea",
+    name: "Cardamom Tea",
     description: "Cardamom-infused green tea with a warm aroma.",
     price: 60,
     category: "tea",
@@ -2390,7 +2420,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#8B5CF6]/20 to-[#F4C542]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
   {
     id: "hp-greentea-mint",
@@ -2402,7 +2432,7 @@ export const menuItems: MenuItem[] = [
     available: true,
     canteenSlug: "hot-potato",
     gradient: "from-[#10B981]/20 to-[#7C3AED]/15",
-    image: "/menu/chai-paratha-category.jpg.png",
+    image: "/images/jasmine-tea.jpg.png",
   },
 
   // Hot Potato — Regular Items

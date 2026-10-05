@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useCart } from "@/components/providers/CartProvider";
-import { DELIVERY_ACTUAL, DELIVERY_CHARGED } from "@/lib/constants";
+import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
 import { formatPrice } from "@/lib/format";
 import {
   buildOrder,
@@ -353,7 +353,7 @@ export default function CheckoutPageContent() {
                   Delivery Charges
                   {form.orderType === "delivery" && (
                     <span className="block text-xs font-normal text-gray-400">
-                      <s>Rs. {DELIVERY_ACTUAL}</s>{" "}Rs. {DELIVERY_CHARGED}
+                      {formatPrice(DELIVERY_FEE_PER_CANTEEN)} per canteen
                     </span>
                   )}
                 </dt>

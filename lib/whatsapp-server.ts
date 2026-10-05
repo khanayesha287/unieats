@@ -16,6 +16,7 @@ export type OrderRecord = {
 export type OrderItemRecord = {
   item_name: string;
   quantity: number;
+  price: number;
 };
 
 export interface WhatsAppSendResult {
@@ -78,10 +79,14 @@ export function formatWhatsAppOrderNotification(
   items: OrderItemRecord[],
 ): string {
   const orderType = order.order_type === "delivery" ? "Delivery" : "Pickup";
-  const itemLines = items.map(
-    (item) =>
-      `• ${cleanText(item.item_name, "Unnamed item")} × ${Math.max(0, Number(item.quantity) || 0)}`,
-  );
+  const itemLines = items.map((item) => {
+    const quantity = Math.max(0, Number(item.quantity) || 0);
+    const unitPrice = Number(item.price);
+    return (
+      `• ${cleanText(item.item_name, "Unnamed item")} × ${quantity} — ` +
+      `Rs. ${formatAmount(unitPrice)} each — Rs. ${formatAmount(quantity * unitPrice)}`
+    );
+  });
 
   return [
     "🔔 *New UniEats Order*",

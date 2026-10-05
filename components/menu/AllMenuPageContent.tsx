@@ -195,7 +195,11 @@ export default function AllMenuPageContent() {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white divide-y divide-gray-100">
               {filteredItems.map((item) => (
-                <FoodCard key={item.id} item={item} showCanteenBadge />
+                <FoodCard
+                  key={`${item.canteenSlug}-${item.category}-${item.id}`}
+                  item={item}
+                  showCanteenBadge
+                />
               ))}
             </div>
           )

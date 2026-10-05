@@ -17,6 +17,7 @@ export const canteens: Canteen[] = [
     description: "Rolls, samosas, snacks, and quick bites for UET students.",
     prepTime: "5–10 min",
     gradient: "from-[#059669] via-[#10B981] to-[#34D399]",
+    image: "/images/gssc-building.jpg.png",
     status: "active",
   },
   {
@@ -26,7 +27,7 @@ export const canteens: Canteen[] = [
       "Fresh karahi, desi food, shakes, juices, and refreshing drinks.",
     prepTime: "10–15 min",
     gradient: "from-[#D97706] via-[#F59E0B] to-[#FCD34D]",
-    image: "/bhola-building.jpg.jpeg",
+    image: "/images/bhola-building.jpg.png",
     status: "active",
   },
   {
@@ -35,6 +36,7 @@ export const canteens: Canteen[] = [
     description: "Refreshing shakes and cold drinks for a quick break.",
     prepTime: "10–15 min",
     gradient: "from-[#DC2626] via-[#EF4444] to-[#FCA5A5]",
+    image: "/images/annexe-building.jpg.png",
     status: "active",
   },
   {
@@ -44,6 +46,7 @@ export const canteens: Canteen[] = [
       "Sandwiches, fries, teas, and quick bites — fresh and flavourful.",
     prepTime: "10–15 min",
     gradient: "from-[#7C3AED] via-[#8B5CF6] to-[#C4B5FD]",
+    image: "/images/hot-potato-building.jpg.png",
     status: "active",
   },
 ];

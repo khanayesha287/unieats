@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildStatusUpdatePayload, supabase } from "@/lib/supabase";
 import { supabaseAuth } from "@/lib/supabase-auth";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
 
 type DriverStatus = "ready" | "out_for_delivery" | "delivered";
 
@@ -423,8 +424,8 @@ export default function DriverPortalContent() {
         order_type: "delivery",
         canteen_id: canteen.id,
         status: "ready",
-        total_amount: 450,
-        delivery_charge: 55,
+        total_amount: 450 + DELIVERY_FEE_PER_CANTEEN,
+        delivery_charge: DELIVERY_FEE_PER_CANTEEN,
         driver_id: null,
       }])
       .select("id")

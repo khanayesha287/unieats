@@ -5,14 +5,14 @@ import { ArrowRight, ShoppingCart, Trash2 } from "lucide-react";
 import QuantitySelector from "@/components/ui/QuantitySelector";
 import { useCart } from "@/components/providers/CartProvider";
 import { formatPrice } from "@/lib/format";
-import { groupItemsByCanteen } from "@/lib/cart-utils";
+import { calculateDeliveryFee, groupItemsByCanteen } from "@/lib/cart-utils";
 import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
 
 export default function CartPageContent() {
   const { items, subtotal, updateQuantity, removeItem, isHydrated } = useCart();
   const canteenGroups = groupItemsByCanteen(items);
-  const discount = 0;
-  const grandTotal = subtotal - discount;
+  const deliveryFee = calculateDeliveryFee(items, "delivery");
+  const grandTotal = subtotal + deliveryFee;
 
   if (!isHydrated) {
     return (
@@ -141,19 +141,15 @@ export default function CartPageContent() {
                 <dt>
                   Delivery Charges
                   <span className="block text-xs font-normal text-gray-400">
-                    Rs.{DELIVERY_FEE_PER_CANTEEN} per order
+                    {formatPrice(DELIVERY_FEE_PER_CANTEEN)} per canteen
                   </span>
                 </dt>
-                <dd className="font-semibold text-gray-400">—</dd>
-              </div>
-              <div className="flex justify-between text-gray-600">
-                <dt>Discount</dt>
-                <dd className="font-semibold text-green-600">
-                  -{formatPrice(discount)}
+                <dd className="font-semibold text-gray-900">
+                  {formatPrice(deliveryFee)}
                 </dd>
               </div>
               <div className="flex justify-between border-t border-gray-100 pt-3 text-base">
-                <dt className="font-bold text-gray-900">Subtotal</dt>
+                <dt className="font-bold text-gray-900">Total (delivery)</dt>
                 <dd className="font-bold text-[#6C2BD9]">
                   {formatPrice(grandTotal)}
                 </dd>

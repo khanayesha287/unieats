@@ -540,11 +540,6 @@ export default function AdminDashboardContent() {
         0,
         Number(selectedOrder?.total_amount ?? 0) - selectedDeliveryCharge,
       );
-  const selectedItemSummary = selectedItems.length > 0
-    ? selectedItems
-        .map((item) => `${item.item_name} ×${item.quantity}`)
-        .join(", ")
-    : "No items recorded";
   const selectedCanteenName =
     selectedOrder && selectedOrder.canteen_id !== null && selectedOrder.canteen_id !== undefined
       ? canteenMap[String(selectedOrder.canteen_id)]?.name ?? "Unknown canteen"
@@ -836,8 +831,27 @@ export default function AdminDashboardContent() {
                       <dd className="inline">{selectedCanteenName}</dd>
                     </div>
                     <div>
-                      <dt className="inline font-semibold text-slate-900">Items: </dt>
-                      <dd className="inline">{selectedItemSummary}</dd>
+                      <dt className="font-semibold text-slate-900">Items:</dt>
+                      {selectedItems.length > 0 ? (
+                        <ul className="mt-1 space-y-1">
+                          {selectedItems.map((item) => {
+                            const quantity = Number(item.quantity ?? 0);
+                            const unitPrice = Number(item.price ?? 0);
+
+                            return (
+                              <li key={item.id}>
+                                <span className="block">{item.item_name} × {quantity}</span>
+                                <span className="block text-slate-500">
+                                  {formatCompactCurrency(unitPrice)} each —{" "}
+                                  {formatCompactCurrency(quantity * unitPrice)}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="mt-1">No items recorded</p>
+                      )}
                     </div>
                     <div>
                       <dt className="inline font-semibold text-slate-900">Subtotal: </dt>

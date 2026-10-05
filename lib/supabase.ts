@@ -276,7 +276,7 @@ export async function saveOrderToSupabase(
   // shown on the website confirmation page.
   order.orderNumber = uniqueOrderNumbers[0];
 
-  // Delivery charge per canteen order (Rs. 25 per canteen for delivery, 0 for pickup)
+  // Delivery charge per canteen order (Rs. 45 per canteen for delivery, 0 for pickup)
   const perCanteenDelivery =
     order.orderType === "delivery" ? DELIVERY_FEE_PER_CANTEEN : 0;
 
@@ -308,7 +308,7 @@ export async function saveOrderToSupabase(
         status: initialStatus,
         total_amount: Number(group.subtotal + perCanteenDelivery),
         delivery_charge: Number(perCanteenDelivery),
-        discount: Number(perCanteenDelivery > 0 ? 25 : 0),
+        discount: 0,
         payment_method: order.paymentMethod ?? null,
         special_instructions: order.specialInstructions ?? null,
         tracking_token_hash: options.trackingTokenHash ?? null,

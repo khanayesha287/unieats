@@ -131,7 +131,7 @@ async function processOne(
           .maybeSingle(),
         client
           .from("order_items")
-          .select("item_name, quantity")
+          .select("item_name, quantity, price")
           .eq("order_id", notification.order_id)
           .order("id", { ascending: true }),
       ]);
