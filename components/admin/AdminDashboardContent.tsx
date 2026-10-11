@@ -826,7 +826,17 @@ export default function AdminDashboardContent() {
                         {selectedOrder.delivery_location || "Delivery Location"}
                       </dd>
                     </div>
-                    <div>
+                        {selectedOrder.special_instructions?.trim() && (
+                          <div>
+                            <dt className="font-semibold text-slate-900">
+                              Special Instructions:
+                            </dt>
+                            <dd className="whitespace-pre-wrap">
+                              {selectedOrder.special_instructions}
+                            </dd>
+                          </div>
+                        )}
+                        <div>
                       <dt className="inline font-semibold text-slate-900">Canteen: </dt>
                       <dd className="inline">{selectedCanteenName}</dd>
                     </div>

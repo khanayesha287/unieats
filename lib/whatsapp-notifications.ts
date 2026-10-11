@@ -154,6 +154,7 @@ async function processOne(
         department: order.department ?? null,
         order_type: String(order.order_type ?? "pickup"),
         delivery_location: order.delivery_location ?? null,
+        special_instructions: order.special_instructions ?? null,
         total_amount: Number(order.total_amount ?? 0),
         payment_method: order.payment_method ?? null,
         created_at: order.created_at ?? null,

@@ -14,14 +14,14 @@ export function calculateSubtotal(items: CartItem[]): number {
 export function formatCartItemName(
   item: Pick<CartItem, "name" | "size" | "selectedAddOns">,
 ): string {
-  if (!item.selectedAddOns?.length) return item.name;
-
   const selections = [
     item.size,
-    ...item.selectedAddOns.map((addOn) => `${addOn.name} topping`),
+    ...(item.selectedAddOns ?? []).map((addOn) => `${addOn.name} topping`),
   ].filter((selection): selection is string => Boolean(selection));
 
-  return `${item.name} (${selections.join(", ")})`;
+  return selections.length > 0
+    ? `${item.name} (${selections.join(", ")})`
+    : item.name;
 }
 
 export function calculateItemCount(items: CartItem[]): number {
@@ -77,7 +77,9 @@ export function buildOrder(
     orderType: form.orderType,
     deliveryLocation:
       form.orderType === "delivery" ? form.deliveryLocation : undefined,
-    specialInstructions: form.specialInstructions.trim() || undefined,
+    specialInstructions: form.specialInstructions.trim()
+      ? form.specialInstructions
+      : undefined,
     paymentMethod: form.paymentMethod,
     canteenOrders,
     subtotal,

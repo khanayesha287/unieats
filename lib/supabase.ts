@@ -344,6 +344,12 @@ export async function saveOrderToSupabase(
           break;
         }
 
+        if (missingColumn === "special_instructions") {
+          orderError = result.error;
+          logOrderError("Order insert is missing the required special_instructions column", result.error);
+          break;
+        }
+
         droppedColumns.push(missingColumn);
         delete attemptRecord[missingColumn];
       }

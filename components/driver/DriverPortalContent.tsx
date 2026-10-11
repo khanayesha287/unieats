@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStatusUpdatePayload, supabase } from "@/lib/supabase";
 import { supabaseAuth } from "@/lib/supabase-auth";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -28,6 +28,7 @@ interface DriverOrder {
   student_name: string;
   phone: string;
   department?: string | null;
+  special_instructions?: string | null;
   order_type: "pickup" | "delivery";
   delivery_location: string | null;
   canteen_id: number | string | null;
@@ -36,10 +37,21 @@ interface DriverOrder {
   delivery_charge: number;
   payment_method?: string | null;
   created_at: string | null;
+  ready_at?: string | null;
+  out_for_delivery_at?: string | null;
+  delivered_at?: string | null;
   driver_id?: string | number | null;
 }
 
-const DRIVER_STATUSES: DriverStatus[] = ["ready", "out_for_delivery", "delivered"];
+const DRIVER_ACTIVE_STATUSES = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready",
+  "out_for_delivery",
+];
+const DRIVER_VISIBLE_STATUSES = [...DRIVER_ACTIVE_STATUSES, "delivered", "completed"];
+const DRIVER_DELIVERY_STATUSES = ["ready", "out_for_delivery", "delivered", "completed"];
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -56,7 +68,7 @@ const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
   confirmed: "Confirmed",
   preparing: "Preparing",
-  ready: "Ready for Pickup",
+  ready: "Ready for Delivery",
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
   completed: "Completed",
@@ -110,6 +122,11 @@ function toShortTime(value?: string | null): string {
   }).format(date);
 }
 
+function uniqueById<T extends { id: number | string }>(records: T[]): T[] {
+  const recordsById = new Map(records.map((record) => [String(record.id), record]));
+  return [...recordsById.values()];
+}
+
 function normalizeDriverStatus(value: unknown): string {
   if (typeof value === "string" && value.trim()) return value;
   return "pending";
@@ -133,6 +150,12 @@ function coerceOrder(input: unknown): DriverOrder | null {
   const record = input as Record<string, unknown>;
   const id = record.id ?? record.order_id ?? null;
   const orderType = pickString(record, ["order_type", "orderType"]);
+  if (
+    (typeof id !== "number" && typeof id !== "string") ||
+    !String(id).trim()
+  ) {
+    return null;
+  }
   if (orderType !== "delivery") return null;
   const statusRaw = pickString(record, ["status"]);
   const canteenId = record.canteen_id ?? record.canteenId ?? null;
@@ -146,16 +169,18 @@ function coerceOrder(input: unknown): DriverOrder | null {
       : Number(record.delivery_charge ?? 0);
 
    return {
-    id:
-      typeof id === "number" || typeof id === "string"
-        ? id
-        : `order-${Math.random().toString(36).slice(2, 9)}`,
+    id,
     order_number:
       pickString(record, ["order_number", "orderNumber"]) ?? "\u2014",
     student_name:
       pickString(record, ["student_name", "studentName", "name"]) ?? "Unknown",
     phone: pickString(record, ["phone", "mobile"]) ?? "\u2014",
     department: pickString(record, ["department"]) ?? null,
+    special_instructions:
+      typeof record.special_instructions === "string" &&
+      record.special_instructions.trim()
+        ? record.special_instructions
+        : null,
     order_type: "delivery",
     delivery_location:
       pickString(record, ["delivery_location", "deliveryLocation"]) ?? null,
@@ -168,6 +193,14 @@ function coerceOrder(input: unknown): DriverOrder | null {
     delivery_charge: Number.isFinite(deliveryCharge) ? deliveryCharge : 0,
     payment_method: pickString(record, ["payment_method", "paymentMethod"]) ?? null,
     created_at: typeof record.created_at === "string" ? record.created_at : null,
+    ready_at: typeof record.ready_at === "string" ? record.ready_at : null,
+    out_for_delivery_at:
+      typeof record.out_for_delivery_at === "string" ? record.out_for_delivery_at : null,
+    delivered_at: typeof record.delivered_at === "string" ? record.delivered_at : null,
+    driver_id:
+      typeof record.driver_id === "number" || typeof record.driver_id === "string"
+        ? record.driver_id
+        : null,
   };
 }
 
@@ -176,6 +209,14 @@ function coerceOrderItem(input: unknown): DriverOrderItem | null {
   const record = input as Record<string, unknown>;
   const id = record.id ?? null;
   const orderId = record.order_id ?? null;
+  if (
+    (typeof id !== "number" && typeof id !== "string") ||
+    !String(id).trim() ||
+    (typeof orderId !== "number" && typeof orderId !== "string") ||
+    !String(orderId).trim()
+  ) {
+    return null;
+  }
   const quantity =
     typeof record.quantity === "number" ? record.quantity : Number(record.quantity ?? 0);
   const price =
@@ -186,14 +227,8 @@ function coerceOrderItem(input: unknown): DriverOrderItem | null {
       : Number(record.subtotal ?? price * quantity);
 
   return {
-    id:
-      typeof id === "number" || typeof id === "string"
-        ? id
-        : `item-${Math.random().toString(36).slice(2, 9)}`,
-    order_id:
-      typeof orderId === "number" || typeof orderId === "string"
-        ? orderId
-        : `order-${Math.random().toString(36).slice(2, 9)}`,
+    id,
+    order_id: orderId,
     item_name: pickString(record, ["item_name", "itemName", "name"]) ?? "Unknown item",
     quantity: Number.isFinite(quantity) ? quantity : 0,
     price: Number.isFinite(price) ? price : 0,
@@ -210,30 +245,41 @@ export default function DriverPortalContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const updateInProgress = useRef(false);
   const [showCompleted, setShowCompleted] = useState(false);
 
   const loadData = useCallback(async (silent = false) => {
     if (!supabaseAuth) {
       setError("Supabase is not configured.");
       setIsLoading(false);
-      return;
+      return false;
     }
 
     if (profile?.role === "driver" && !profile.id) {
       setError("Driver profile is not available.");
       setIsLoading(false);
-      return;
+      return false;
     }
 
-    let ordersQuery = supabaseAuth.from("orders").select("*").eq("order_type", "delivery");
+    let ordersQuery = supabaseAuth
+      .from("orders")
+      .select(
+        "id,order_number,student_name,phone,department,special_instructions,order_type,delivery_location,canteen_id,status,total_amount,delivery_charge,payment_method,created_at,ready_at,out_for_delivery_at,delivered_at,driver_id",
+      )
+      .eq("order_type", "delivery");
     if (profile?.role === "driver") {
-      ordersQuery = ordersQuery.eq("driver_id", profile.id);
+      ordersQuery = ordersQuery.or(
+        `driver_id.is.null,driver_id.eq.${profile.id}`,
+      );
     }
 
     const [ordersResult, canteensResult, itemsResult] = await Promise.all([
       ordersQuery,
-      supabaseAuth.from("canteens").select("*"),
-      supabaseAuth.from("order_items").select("*"),
+      supabaseAuth.from("canteens").select("id,name"),
+      supabaseAuth
+        .from("order_items")
+        .select("id,order_id,item_name,quantity,price,subtotal"),
     ]);
 
     if (ordersResult.error && !isMissingTableError(ordersResult.error)) {
@@ -249,21 +295,26 @@ export default function DriverPortalContent() {
     const newCanteens = Array.isArray(canteensResult.data)
       ? canteensResult.data.map(coerceCanteen).filter((r): r is CanteenRecord => r !== null)
       : [];
-    const newOrders = (Array.isArray(ordersResult.data) ? ordersResult.data : [])
+    const fetchedOrders = (Array.isArray(ordersResult.data) ? ordersResult.data : [])
       .map(coerceOrder)
       .filter((r): r is DriverOrder => r !== null)
-      .filter((o) => {
-        // Only show orders that have reached "ready" stage or later
-        const preDriverStatuses = ["pending", "confirmed", "preparing", "cancelled"];
-        return !preDriverStatuses.includes(o.status);
-      })
+      .filter((o) =>
+        profile?.role === "driver"
+          ? DRIVER_DELIVERY_STATUSES.includes(o.status)
+          : DRIVER_VISIBLE_STATUSES.includes(o.status),
+      );
+    const newOrders = uniqueById(fetchedOrders)
       .sort((a, b) => {
         const at = a.created_at ? new Date(a.created_at).getTime() : 0;
         const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
         return bt - at;
       });
     const newItems = Array.isArray(itemsResult.data)
-      ? itemsResult.data.map(coerceOrderItem).filter((r): r is DriverOrderItem => r !== null)
+      ? uniqueById(
+          itemsResult.data
+            .map(coerceOrderItem)
+            .filter((r): r is DriverOrderItem => r !== null),
+        )
       : [];
 
     const hasRealError =
@@ -276,6 +327,7 @@ export default function DriverPortalContent() {
     setItems(newItems);
     setError(hasRealError ? "Some queries failed. Check console." : null);
     if (!silent) setIsLoading(false);
+    return !ordersResult.error;
   }, [profile]);
 
   useEffect(() => {
@@ -337,12 +389,12 @@ export default function DriverPortalContent() {
   }, [items]);
 
   const activeOrders = useMemo(
-    () => orders.filter((o) => o.status === "ready" || o.status === "out_for_delivery"),
+    () => orders.filter((o) => DRIVER_ACTIVE_STATUSES.includes(o.status)),
     [orders],
   );
 
   const completedOrders = useMemo(
-    () => orders.filter((o) => o.status === "delivered"),
+    () => orders.filter((o) => o.status === "delivered" || o.status === "completed"),
     [orders],
   );
 
@@ -351,57 +403,104 @@ export default function DriverPortalContent() {
     [orders, selectedOrderId],
   );
 
-  const updateStatus = async (orderId: number | string, nextStatus: string) => {
-    if (!supabaseAuth) return;
-
-    // Build payload with timestamp; fall back to status-only if columns don't exist
-    let payload: Record<string, unknown> = { status: nextStatus };
-    try {
-      const { data: existing } = await supabaseAuth
-        .from("orders")
-        .select("ready_at,out_for_delivery_at,delivered_at")
-        .eq("id", orderId)
-        .maybeSingle();
-      payload = buildStatusUpdatePayload(nextStatus, existing ?? undefined);
-    } catch { /* columns may not exist yet */ }
-
-    setIsUpdating(true);
-    let updateQuery = supabaseAuth
-      .from("orders")
-      .update(payload)
-      .eq("id", orderId);
-    if (profile?.role === "driver") {
-      updateQuery = updateQuery.eq("driver_id", profile.id);
-    }
-    let { error: updateError } = await updateQuery;
-
-    // If update failed (e.g. missing timestamp columns), retry with status-only
-    if (updateError && Object.keys(payload).length > 1) {
-      let retryQuery = supabaseAuth
-        .from("orders")
-        .update({ status: nextStatus })
-        .eq("id", orderId);
-      if (profile?.role === "driver") {
-        retryQuery = retryQuery.eq("driver_id", profile.id);
-      }
-      const { error: retryError } = await retryQuery;
-      updateError = retryError;
-    }
-
-    setIsUpdating(false);
-
-    if (updateError) {
-      console.error("[UniEats Driver] Status update failed:", updateError.message);
-      setError("Failed to update status. Check console.");
+  const updateStatus = async (
+    orderId: number | string,
+    nextStatus: "out_for_delivery" | "delivered",
+  ) => {
+    if (updateInProgress.current) return;
+    if (!supabaseAuth) {
+      setError("Supabase is not configured.");
       return;
     }
 
-    setOrders((current) =>
-      current.map((o) =>
-        String(o.id) === String(orderId) ? { ...o, status: nextStatus } : o,
-      ),
-    );
+    const currentOrder = orders.find((order) => String(order.id) === String(orderId));
+    if (
+      profile?.role === "driver" &&
+      (!profile.id ||
+        !currentOrder ||
+        String(currentOrder.driver_id ?? "") !== String(profile.id) ||
+        !(
+          (currentOrder.status === "ready" && nextStatus === "out_for_delivery") ||
+          (currentOrder.status === "out_for_delivery" && nextStatus === "delivered")
+        ))
+    ) {
+      setError("Only assigned deliveries at the correct stage can be updated.");
+      return;
+    }
+
+    updateInProgress.current = true;
+    setIsUpdating(true);
     setError(null);
+    setUpdateMessage(null);
+
+    try {
+      // Build payload with timestamp; fall back to status-only if columns don't exist.
+      let payload: Record<string, unknown> = { status: nextStatus };
+      const timestampQuery = supabaseAuth
+        .from("orders")
+        .select("ready_at,out_for_delivery_at,delivered_at")
+        .eq("id", orderId);
+      const scopedTimestampQuery =
+        profile?.role === "driver"
+          ? timestampQuery.eq("driver_id", profile.id)
+          : timestampQuery;
+      const { data: existing } = await scopedTimestampQuery.maybeSingle();
+      payload = buildStatusUpdatePayload(nextStatus, existing ?? undefined);
+
+      let updateQuery = supabaseAuth
+        .from("orders")
+        .update(payload)
+        .eq("id", orderId);
+      if (profile?.role === "driver") {
+        updateQuery = updateQuery.eq("driver_id", profile.id);
+      }
+      let { data: updatedOrder, error: updateError } = await updateQuery
+        .select("id,status")
+        .maybeSingle();
+
+      // If update failed (e.g. missing timestamp columns), retry with status-only.
+      if (updateError && Object.keys(payload).length > 1) {
+        let retryQuery = supabaseAuth
+          .from("orders")
+          .update({ status: nextStatus })
+          .eq("id", orderId);
+        if (profile?.role === "driver") {
+          retryQuery = retryQuery.eq("driver_id", profile.id);
+        }
+        const retryResult = await retryQuery.select("id,status").maybeSingle();
+        updatedOrder = retryResult.data;
+        updateError = retryResult.error;
+      }
+
+      if (updateError || !updatedOrder) {
+        console.error(
+          "[UniEats Driver] Status update failed:",
+          updateError?.message ?? "No assigned order matched the update filters.",
+        );
+        setError("Failed to update delivery status. Refresh and try again.");
+        return;
+      }
+
+      setOrders((current) =>
+        current.map((order) =>
+          String(order.id) === String(orderId)
+            ? { ...order, status: nextStatus }
+            : order,
+        ),
+      );
+      const refreshed = await loadData(true);
+      if (!refreshed) {
+        setError("Delivery status was updated, but the order list could not refresh.");
+        return;
+      }
+      setUpdateMessage("Delivery status updated.");
+    } catch (updateFailure) {
+      console.error("[UniEats Driver] Status update failed:", updateFailure);
+      setError("Failed to update delivery status. Refresh and try again.");
+    } finally {
+      updateInProgress.current = false;
+      setIsUpdating(false);
+    }
   };
 
   const insertTestDelivery = async () => {
@@ -486,6 +585,11 @@ export default function DriverPortalContent() {
             {error}
           </div>
         )}
+        {updateMessage && (
+          <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            {updateMessage}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 shadow-sm">
@@ -518,14 +622,14 @@ export default function DriverPortalContent() {
             {/* Active Deliveries */}
             <section className="mb-6">
               <h2 className="mb-3 text-lg font-bold text-slate-900">
-                Active Deliveries
+                Incoming & Active Deliveries
               </h2>
 
               {activeOrders.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 px-4 py-12 text-center">
                   <p className="text-3xl" aria-hidden>&#x1F4E6;</p>
                   <p className="mt-2 text-sm font-medium text-slate-500">
-                    No active deliveries right now.
+                    No incoming or active deliveries right now.
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     New delivery orders will appear here automatically.
@@ -539,6 +643,13 @@ export default function DriverPortalContent() {
                       ? canteenMap[String(order.canteen_id)]?.name ?? "Unknown"
                       : "Unknown";
                     const isSelected = String(selectedOrderId) === String(order.id);
+                    const isAssignedToCurrentDriver =
+                      profile?.role !== "driver" ||
+                      Boolean(
+                        profile.id &&
+                          order.driver_id != null &&
+                          String(order.driver_id) === String(profile.id),
+                      );
 
                     return (
                       <div
@@ -571,6 +682,13 @@ export default function DriverPortalContent() {
                                   {STATUS_LABELS[order.status] ?? order.status.replace(/_/g, " ")}
                                 </span>
                               </div>
+                              {profile?.role === "driver" && (
+                                <p className="mt-1 text-xs font-medium text-slate-500">
+                                  {isAssignedToCurrentDriver
+                                    ? "Assigned to you"
+                                    : "Awaiting driver assignment"}
+                                </p>
+                              )}
                               <p className="mt-1 text-sm font-medium text-slate-800">
                                 {order.student_name}
                               </p>
@@ -603,6 +721,12 @@ export default function DriverPortalContent() {
                                 {order.delivery_location}
                               </p>
                             )}
+                            {order.special_instructions && (
+                              <p className="whitespace-pre-wrap">
+                                <span className="font-medium text-slate-500">Special Instructions:</span>{" "}
+                                {order.special_instructions}
+                              </p>
+                            )}
                             <p className="flex items-center gap-1.5">
                               <span className="font-medium text-slate-500">Items:</span>
                               {orderItems.length} item{orderItems.length !== 1 ? "s" : ""}
@@ -614,6 +738,18 @@ export default function DriverPortalContent() {
                         {isSelected && (
                           <div className="border-t border-slate-200 bg-white px-4 pb-4 pt-3">
                             <div className="space-y-3 text-sm">
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                  Order Reference
+                                </p>
+                                <p className="mt-2 font-medium text-slate-900">
+                                  Order #{order.order_number}
+                                </p>
+                                <p className="break-all text-xs text-slate-500">
+                                  ID: {String(order.id)}
+                                </p>
+                              </div>
+
                               {/* Contact info */}
                               <div className="rounded-xl bg-slate-50 p-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -623,12 +759,18 @@ export default function DriverPortalContent() {
                                   <p className="font-medium text-slate-900">
                                     {order.student_name}
                                   </p>
-                                  <a
-                                    href={`tel:${order.phone}`}
-                                    className="block text-sm font-semibold text-violet-600 underline"
-                                  >
-                                    {order.phone}
-                                  </a>
+                                  {order.phone !== "\u2014" ? (
+                                    <a
+                                      href={`tel:${order.phone}`}
+                                      className="block text-sm font-semibold text-violet-600 underline"
+                                    >
+                                      {order.phone}
+                                    </a>
+                                  ) : (
+                                    <p className="text-sm text-slate-500">
+                                      Phone number unavailable
+                                    </p>
+                                  )}
                                   {order.department && (
                                     <p className="text-xs text-slate-500">
                                       {order.department}
@@ -706,14 +848,23 @@ export default function DriverPortalContent() {
                                 </div>
                               </div>
 
-                              <p className="text-xs text-slate-400">
-                                Ordered: {toDateTime(order.created_at)}
-                              </p>
+                              <div className="space-y-1 text-xs text-slate-500">
+                                <p>Ordered: {toDateTime(order.created_at)}</p>
+                                {order.ready_at && (
+                                  <p>Ready: {toDateTime(order.ready_at)}</p>
+                                )}
+                                {order.out_for_delivery_at && (
+                                  <p>Out for delivery: {toDateTime(order.out_for_delivery_at)}</p>
+                                )}
+                                {order.delivered_at && (
+                                  <p>Delivered: {toDateTime(order.delivered_at)}</p>
+                                )}
+                              </div>
                             </div>
 
                             {/* ACTION BUTTON - Large and touch-friendly */}
                             <div className="mt-4">
-                              {order.status === "ready" && (
+                              {order.status === "ready" && isAssignedToCurrentDriver && (
                                 <button
                                   type="button"
                                   disabled={isUpdating}
@@ -725,7 +876,7 @@ export default function DriverPortalContent() {
                                   {isUpdating ? "Updating..." : "Start Delivery"}
                                 </button>
                               )}
-                              {order.status === "out_for_delivery" && (
+                              {order.status === "out_for_delivery" && isAssignedToCurrentDriver && (
                                 <button
                                   type="button"
                                   disabled={isUpdating}

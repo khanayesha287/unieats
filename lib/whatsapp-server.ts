@@ -7,6 +7,7 @@ export type OrderRecord = {
   department?: string | null;
   order_type: string;
   delivery_location?: string | null;
+  special_instructions?: string | null;
   total_amount: number;
   payment_method?: string | null;
   created_at?: string | null;
@@ -98,6 +99,9 @@ export function formatWhatsAppOrderNotification(
     order.department ? `*Department:* ${cleanText(order.department, "")}` : null,
     order.delivery_location && order.order_type === "delivery"
       ? `*Delivery Location:* ${cleanText(order.delivery_location, "")}`
+      : null,
+    order.special_instructions?.trim()
+      ? `*Special Instructions:*\n${order.special_instructions}`
       : null,
     "",
     "*Items:*",

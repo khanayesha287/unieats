@@ -37,6 +37,7 @@ interface PortalOrder {
   phone: string;
   order_type: "pickup" | "delivery";
   delivery_location?: string | null;
+  special_instructions?: string | null;
   canteen_id?: number | string | null;
   status: CanteenStatus;
   total_amount: number;
@@ -164,6 +165,11 @@ function coerceOrder(input: unknown): PortalOrder | null {
       pickString(record, ["order_type", "orderType"]) === "delivery" ? "delivery" : "pickup",
     delivery_location:
       pickString(record, ["delivery_location", "deliveryLocation", "location"]) ?? null,
+    special_instructions:
+      typeof record.special_instructions === "string" &&
+      record.special_instructions.trim()
+        ? record.special_instructions
+        : null,
     canteen_id:
       typeof canteenId === "number" || typeof canteenId === "string" ? canteenId : null,
     status: normalizeStatus(record.status),
@@ -451,6 +457,14 @@ function CanteenPortalContentInner() {
               <div className="sm:col-span-2">
                 <span className="text-xs text-slate-500">Delivery Location</span>
                 <p className="font-medium text-slate-900">{order.delivery_location}</p>
+              </div>
+            )}
+            {order.special_instructions && (
+              <div className="sm:col-span-2">
+                <span className="text-xs text-slate-500">Special Instructions</span>
+                <p className="whitespace-pre-wrap font-medium text-slate-900">
+                  {order.special_instructions}
+                </p>
               </div>
             )}
             {paymentLabel && (
