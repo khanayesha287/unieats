@@ -16,7 +16,6 @@ import {
 import { saveOrderToSupabase } from "@/lib/supabase";
 import {
   createTrackingToken,
-  hashTrackingToken,
   rememberTrackingReference,
 } from "@/lib/order-tracking";
 import type { CheckoutFormData, OrderType } from "@/lib/types";
@@ -106,19 +105,15 @@ export default function CheckoutPageContent() {
     const trackingToken = createTrackingToken();
     order.trackingToken = trackingToken;
 
-    // ── Supabase FIRST: order must be saved before anything else.
-    // saveOrderToSupabase assigns unique per-canteen order numbers and
-    // updates order.orderNumber with the first generated number.
+    // Do not show success or dispatch notifications unless persistence succeeds.
     let savedOrder: Awaited<ReturnType<typeof saveOrderToSupabase>>;
     try {
-      savedOrder = await saveOrderToSupabase(order, {
-        trackingTokenHash: await hashTrackingToken(trackingToken),
-      });
+      savedOrder = await saveOrderToSupabase(order);
     } catch (error) {
       const errMsg =
         error instanceof Error ? error.message : "Unknown error";
       console.error("[UniEats] Supabase order save failed:", errMsg);
-      setOrderError("Unable to place your order right now. Please try again.");
+      setOrderError(errMsg);
       submittedRef.current = false;
       setIsSubmitting(false);
       return;

@@ -35,7 +35,6 @@ interface DriverOrder {
   status: DriverStatus | string;
   total_amount: number;
   delivery_charge: number;
-  payment_method?: string | null;
   created_at: string | null;
   ready_at?: string | null;
   out_for_delivery_at?: string | null;
@@ -88,12 +87,6 @@ function pickString(
   return null;
 }
 
-function isMissingTableError(error: { message?: string } | null): boolean {
-  return Boolean(
-    error && /Could not find the table 'public\.[^']+' in the schema cache/i.test(error.message ?? ""),
-  );
-}
-
 function toCurrency(value: number): string {
   return new Intl.NumberFormat("en-PK", {
     style: "currency",
@@ -125,6 +118,66 @@ function toShortTime(value?: string | null): string {
 function uniqueById<T extends { id: number | string }>(records: T[]): T[] {
   const recordsById = new Map(records.map((record) => [String(record.id), record]));
   return [...recordsById.values()];
+}
+
+function getQueryErrorMetadata(
+  error: unknown,
+  response: { status: number; statusText: string },
+) {
+  const readField = (value: unknown, field: string): unknown => {
+    if (typeof value !== "object" || value === null) return undefined;
+    try {
+      return (value as Record<string, unknown>)[field];
+    } catch {
+      return undefined;
+    }
+  };
+  if (typeof error !== "object" || error === null) {
+    return {
+      name: null,
+      message:
+        typeof error === "string"
+          ? error
+          : "Unexpected non-object error value returned by Supabase.",
+      code: null,
+      details: null,
+      hint: null,
+      status: response.status,
+      statusText: response.statusText,
+      responseBody: null,
+    };
+  }
+
+  const stringField = (value: unknown): string | null =>
+    typeof value === "string" && value.length > 0 ? value : null;
+  const bodyFields = ["code", "message", "details", "hint"] as const;
+  const responseBody = Object.fromEntries(
+    bodyFields
+      .map((field) => [field, stringField(readField(error, field))] as const)
+      .filter((entry): entry is readonly [typeof bodyFields[number], string] => entry[1] !== null),
+  );
+  const metadata = {
+    name: stringField(readField(error, "name")),
+    message: stringField(readField(error, "message")),
+    code: stringField(readField(error, "code")),
+    details: stringField(readField(error, "details")),
+    hint: stringField(readField(error, "hint")),
+    status: response.status,
+    statusText: response.statusText,
+    responseBody:
+      Object.keys(responseBody).length > 0 ? responseBody : null,
+  };
+
+  if (
+    metadata.name === null &&
+    metadata.message === null &&
+    metadata.code === null &&
+    metadata.details === null &&
+    metadata.hint === null
+  ) {
+    metadata.message = "Empty error object returned by Supabase.";
+  }
+  return metadata;
 }
 
 function normalizeDriverStatus(value: unknown): string {
@@ -191,7 +244,6 @@ function coerceOrder(input: unknown): DriverOrder | null {
     status: normalizeDriverStatus(statusRaw),
     total_amount: Number.isFinite(totalAmount) ? totalAmount : 0,
     delivery_charge: Number.isFinite(deliveryCharge) ? deliveryCharge : 0,
-    payment_method: pickString(record, ["payment_method", "paymentMethod"]) ?? null,
     created_at: typeof record.created_at === "string" ? record.created_at : null,
     ready_at: typeof record.ready_at === "string" ? record.ready_at : null,
     out_for_delivery_at:
@@ -237,7 +289,7 @@ function coerceOrderItem(input: unknown): DriverOrderItem | null {
 }
 
 export default function DriverPortalContent() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<DriverOrder[]>([]);
   const [items, setItems] = useState<DriverOrderItem[]>([]);
   const [canteens, setCanteens] = useState<CanteenRecord[]>([]);
@@ -248,29 +300,33 @@ export default function DriverPortalContent() {
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const updateInProgress = useRef(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const profileError = !authLoading
+    ? !supabaseAuth
+      ? "Supabase is not configured."
+      : !profile
+        ? "An active staff profile is required to view deliveries."
+        : profile.role === "driver" && !profile.driver_id
+          ? "This rider account is not linked to a driver record. Contact an administrator."
+          : null
+    : null;
 
   const loadData = useCallback(async (silent = false) => {
-    if (!supabaseAuth) {
-      setError("Supabase is not configured.");
-      setIsLoading(false);
-      return false;
-    }
-
-    if (profile?.role === "driver" && !profile.id) {
-      setError("Driver profile is not available.");
-      setIsLoading(false);
-      return false;
-    }
+    if (
+      authLoading ||
+      !supabaseAuth ||
+      !profile ||
+      (profile.role === "driver" && !profile.driver_id)
+    ) return false;
 
     let ordersQuery = supabaseAuth
       .from("orders")
       .select(
-        "id,order_number,student_name,phone,department,special_instructions,order_type,delivery_location,canteen_id,status,total_amount,delivery_charge,payment_method,created_at,ready_at,out_for_delivery_at,delivered_at,driver_id",
+        "id,order_number,student_name,phone,department,special_instructions,order_type,delivery_location,canteen_id,status,total_amount,delivery_charge,created_at,ready_at,out_for_delivery_at,delivered_at,driver_id",
       )
       .eq("order_type", "delivery");
-    if (profile?.role === "driver") {
+    if (profile.role === "driver") {
       ordersQuery = ordersQuery.or(
-        `driver_id.is.null,driver_id.eq.${profile.id}`,
+        `driver_id.is.null,driver_id.eq.${profile.driver_id}`,
       );
     }
 
@@ -282,14 +338,34 @@ export default function DriverPortalContent() {
         .select("id,order_id,item_name,quantity,price,subtotal"),
     ]);
 
-    if (ordersResult.error && !isMissingTableError(ordersResult.error)) {
-      console.error("[UniEats Driver] Orders fetch error:", ordersResult.error.message);
-    }
-    if (canteensResult.error && !isMissingTableError(canteensResult.error)) {
-      console.error("[UniEats Driver] Canteens fetch error:", canteensResult.error.message);
-    }
-    if (itemsResult.error && !isMissingTableError(itemsResult.error)) {
-      console.error("[UniEats Driver] Items fetch error:", itemsResult.error.message);
+    const queryFailures = [
+      {
+        operation: "orders.select",
+        error: ordersResult.error,
+        status: ordersResult.status,
+        statusText: ordersResult.statusText,
+      },
+      {
+        operation: "canteens.select",
+        error: canteensResult.error,
+        status: canteensResult.status,
+        statusText: canteensResult.statusText,
+      },
+      {
+        operation: "order_items.select",
+        error: itemsResult.error,
+        status: itemsResult.status,
+        statusText: itemsResult.statusText,
+      },
+    ].filter(
+      (failure): failure is typeof failure & { error: NonNullable<typeof failure.error> } =>
+        Boolean(failure.error),
+    );
+    for (const { operation, error, status, statusText } of queryFailures) {
+      const metadata = getQueryErrorMetadata(error, { status, statusText });
+      console.error(
+        `[UniEats Driver] ${operation} failed: ${JSON.stringify(metadata)}`,
+      );
     }
 
     const newCanteens = Array.isArray(canteensResult.data)
@@ -299,7 +375,7 @@ export default function DriverPortalContent() {
       .map(coerceOrder)
       .filter((r): r is DriverOrder => r !== null)
       .filter((o) =>
-        profile?.role === "driver"
+        profile.role === "driver"
           ? DRIVER_DELIVERY_STATUSES.includes(o.status)
           : DRIVER_VISIBLE_STATUSES.includes(o.status),
       );
@@ -317,33 +393,39 @@ export default function DriverPortalContent() {
         )
       : [];
 
-    const hasRealError =
-      Boolean(ordersResult.error && !isMissingTableError(ordersResult.error)) ||
-      Boolean(canteensResult.error && !isMissingTableError(canteensResult.error)) ||
-      Boolean(itemsResult.error && !isMissingTableError(itemsResult.error));
-
     setCanteens(newCanteens);
     setOrders(newOrders);
     setItems(newItems);
-    setError(hasRealError ? "Some queries failed. Check console." : null);
+    setError(
+      queryFailures.length > 0
+        ? `Delivery data could not be fully loaded (${queryFailures.map((failure) => failure.operation).join(", ")}). Check your connection or contact an administrator.`
+        : null,
+    );
     if (!silent) setIsLoading(false);
     return !ordersResult.error;
-  }, [profile]);
+  }, [authLoading, profile]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    if (
+      authLoading ||
+      !supabaseAuth ||
+      !profile ||
+      (profile.role === "driver" && !profile.driver_id)
+    ) return;
+    void Promise.resolve().then(() => loadData());
+  }, [authLoading, loadData, profile]);
 
   // Polling every 15 s — silent refresh (no loading flash)
   useEffect(() => {
+    if (authLoading || !profile) return;
     const interval = setInterval(() => {
       void loadData(true);
     }, 15_000);
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [authLoading, loadData, profile]);
 
   useEffect(() => {
-    if (!supabaseAuth) return;
+    if (authLoading || !profile || !supabaseAuth) return;
 
     const channel = supabaseAuth
       .channel("driver-orders-realtime")
@@ -372,7 +454,7 @@ export default function DriverPortalContent() {
     return () => {
       if (supabaseAuth) void supabaseAuth.removeChannel(channel);
     };
-  }, [loadData]);
+  }, [authLoading, loadData, profile]);
 
   const canteenMap = useMemo(
     () => Object.fromEntries(canteens.map((c) => [String(c.id), c])) as Record<string, CanteenRecord>,
@@ -414,11 +496,12 @@ export default function DriverPortalContent() {
     }
 
     const currentOrder = orders.find((order) => String(order.id) === String(orderId));
+    const driverId = profile?.role === "driver" ? profile.driver_id : null;
     if (
       profile?.role === "driver" &&
-      (!profile.id ||
+      (!driverId ||
         !currentOrder ||
-        String(currentOrder.driver_id ?? "") !== String(profile.id) ||
+        String(currentOrder.driver_id ?? "") !== driverId ||
         !(
           (currentOrder.status === "ready" && nextStatus === "out_for_delivery") ||
           (currentOrder.status === "out_for_delivery" && nextStatus === "delivered")
@@ -441,18 +524,25 @@ export default function DriverPortalContent() {
         .select("ready_at,out_for_delivery_at,delivered_at")
         .eq("id", orderId);
       const scopedTimestampQuery =
-        profile?.role === "driver"
-          ? timestampQuery.eq("driver_id", profile.id)
+        driverId
+          ? timestampQuery.eq("driver_id", driverId)
           : timestampQuery;
-      const { data: existing } = await scopedTimestampQuery.maybeSingle();
+      const { data: existing, error: timestampError } =
+        await scopedTimestampQuery.maybeSingle();
+      if (timestampError) {
+        console.error("[UniEats Driver] order_timestamps.select failed:", {
+          code: timestampError.code,
+          message: timestampError.message,
+        });
+      }
       payload = buildStatusUpdatePayload(nextStatus, existing ?? undefined);
 
       let updateQuery = supabaseAuth
         .from("orders")
         .update(payload)
         .eq("id", orderId);
-      if (profile?.role === "driver") {
-        updateQuery = updateQuery.eq("driver_id", profile.id);
+      if (driverId) {
+        updateQuery = updateQuery.eq("driver_id", driverId);
       }
       let { data: updatedOrder, error: updateError } = await updateQuery
         .select("id,status")
@@ -464,8 +554,8 @@ export default function DriverPortalContent() {
           .from("orders")
           .update({ status: nextStatus })
           .eq("id", orderId);
-        if (profile?.role === "driver") {
-          retryQuery = retryQuery.eq("driver_id", profile.id);
+        if (driverId) {
+          retryQuery = retryQuery.eq("driver_id", driverId);
         }
         const retryResult = await retryQuery.select("id,status").maybeSingle();
         updatedOrder = retryResult.data;
@@ -501,6 +591,60 @@ export default function DriverPortalContent() {
       updateInProgress.current = false;
       setIsUpdating(false);
     }
+  };
+
+  const confirmOrder = async (order: DriverOrder) => {
+    if (
+      profile?.role === "driver" &&
+      order.driver_id == null
+    ) {
+      if (!supabaseAuth || !profile.driver_id) {
+        setError("This rider account is not linked to a driver record.");
+        return;
+      }
+      if (updateInProgress.current) return;
+
+      updateInProgress.current = true;
+      setIsUpdating(true);
+      setError(null);
+      setUpdateMessage(null);
+      try {
+        const { data: claimed, error: claimError } = await supabaseAuth.rpc(
+          "claim_delivery_order",
+          { p_order_id: String(order.id) },
+        );
+        if (claimError) {
+          console.error("[UniEats Driver] claim_delivery_order failed:", {
+            code: claimError.code,
+            message: claimError.message,
+            orderId: String(order.id),
+          });
+          setError("Could not confirm this order. It may already have been claimed; refresh and try again.");
+          return;
+        }
+        if (claimed !== true) {
+          await loadData(true);
+          setError("This order is no longer available to claim.");
+          return;
+        }
+
+        const refreshed = await loadData(true);
+        if (!refreshed) {
+          setError("The order was claimed, but the delivery list could not refresh.");
+          return;
+        }
+        setUpdateMessage("Order confirmed and assigned to you.");
+      } catch (claimFailure) {
+        console.error("[UniEats Driver] claim_delivery_order failed:", claimFailure);
+        setError("Could not confirm this order. Refresh and try again.");
+      } finally {
+        updateInProgress.current = false;
+        setIsUpdating(false);
+      }
+      return;
+    }
+
+    await updateStatus(order.id, "out_for_delivery");
   };
 
   const insertTestDelivery = async () => {
@@ -580,9 +724,9 @@ export default function DriverPortalContent() {
       </div>
 
       <div className="mx-auto max-w-2xl px-4 py-5 sm:px-6">
-        {error && (
+        {(error || profileError) && (
           <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
+            {error ?? profileError}
           </div>
         )}
         {updateMessage && (
@@ -591,7 +735,7 @@ export default function DriverPortalContent() {
           </div>
         )}
 
-        {isLoading ? (
+        {authLoading || (isLoading && !profileError) ? (
           <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 shadow-sm">
             Loading deliveries...
           </div>
@@ -646,9 +790,9 @@ export default function DriverPortalContent() {
                     const isAssignedToCurrentDriver =
                       profile?.role !== "driver" ||
                       Boolean(
-                        profile.id &&
+                        profile.driver_id &&
                           order.driver_id != null &&
-                          String(order.driver_id) === String(profile.id),
+                          String(order.driver_id) === String(profile.driver_id),
                       );
 
                     return (
@@ -779,18 +923,6 @@ export default function DriverPortalContent() {
                                 </div>
                               </div>
 
-                              {/* Payment method */}
-                              {order.payment_method && (
-                                <div className="rounded-xl bg-violet-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">
-                                    Payment Method
-                                  </p>
-                                  <p className="mt-1 font-semibold text-slate-900">
-                                    {order.payment_method === "cod" ? "Cash on Delivery (COD)" : "Online Payment"}
-                                  </p>
-                                </div>
-                              )}
-
                               {/* Delivery location */}
                               {order.delivery_location && (
                                 <div className="rounded-xl bg-emerald-50 p-3">
@@ -864,16 +996,15 @@ export default function DriverPortalContent() {
 
                             {/* ACTION BUTTON - Large and touch-friendly */}
                             <div className="mt-4">
-                              {order.status === "ready" && isAssignedToCurrentDriver && (
+                              {order.status === "ready" &&
+                                (isAssignedToCurrentDriver || order.driver_id == null) && (
                                 <button
                                   type="button"
                                   disabled={isUpdating}
-                                  onClick={() =>
-                                    void updateStatus(order.id, "out_for_delivery")
-                                  }
+                                  onClick={() => void confirmOrder(order)}
                                   className="w-full rounded-2xl bg-violet-600 py-4 text-base font-bold text-white shadow-lg shadow-violet-600/20 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                                 >
-                                  {isUpdating ? "Updating..." : "Start Delivery"}
+                                  {isUpdating ? "Updating..." : "Order Confirmed"}
                                 </button>
                               )}
                               {order.status === "out_for_delivery" && isAssignedToCurrentDriver && (

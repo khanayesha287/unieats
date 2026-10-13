@@ -221,7 +221,7 @@ async function fetchPortalData() {
 
   const [ordersResult, canteensResult, itemsResult] = await Promise.all([
     supabaseAuth.from("orders").select("*"),
-    supabaseAuth.from("canteens").select("*"),
+    supabaseAuth.from("canteens").select("id, name"),
     supabaseAuth.from("order_items").select("*"),
   ]);
 

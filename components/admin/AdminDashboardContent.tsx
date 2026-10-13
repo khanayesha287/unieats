@@ -162,11 +162,9 @@ function coerceDriver(input: unknown): AdminDriver | null {
   if (!input || typeof input !== "object") return null;
 
   const record = input as Record<string, unknown>;
-  const rawId = record.id ?? record.driver_id ?? record.driverId ?? record.uuid ?? record._id ?? null;
-  const id: string | number =
-    typeof rawId === "string" || typeof rawId === "number"
-      ? rawId
-      : `driver-${Math.random().toString(36).slice(2, 9)}`;
+  const rawId = record.driver_id ?? null;
+  if (typeof rawId !== "string" || !rawId.trim()) return null;
+  const id = rawId;
   const name =
     pickString(record, ["name", "full_name", "driver_name", "driverName", "username"]) ??
     `Driver ${String(id)}`;
@@ -191,10 +189,10 @@ async function fetchDashboardData() {
 
   const [ordersResult, canteensResult, driversResult, itemsResult] = await Promise.all([
     supabaseAuth.from("orders").select("*"),
-    supabaseAuth.from("canteens").select("*"),
+    supabaseAuth.from("canteens").select("id, name"),
     supabaseAuth
       .from("staff_profiles")
-      .select("id, name, role, active")
+      .select("id, driver_id, name, role, active")
       .eq("role", "driver")
       .eq("active", true),
     supabaseAuth.from("order_items").select("*"),

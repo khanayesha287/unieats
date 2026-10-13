@@ -6,6 +6,7 @@ export interface StaffProfile {
   name: string;
   role: Role;
   canteen_id?: string | null;
+  driver_id?: string | null;
   active: boolean;
 }
 
