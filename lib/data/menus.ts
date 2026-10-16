@@ -2187,7 +2187,7 @@ export const menuItems: MenuItem[] = [
     image: "/menu/shakes-juices-category.jpg.png",
   },
   {
-    id: "bhola-drink-lemon-soda",
+    id: "bhola-drink-lemon-soda-fizzy",
     name: "Lemon Soda",
     description: "Cool lemon soda with a fizzy, refreshing finish.",
     price: 110,

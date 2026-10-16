@@ -47,6 +47,8 @@ export interface MenuItemOption {
 
 export interface CartItem {
   id: string;
+  /** Frontend catalogue ID used to resolve the canonical database menu row. */
+  menuItemKey?: string;
   name: string;
   price: number;
   quantity: number;
@@ -90,7 +92,7 @@ export interface CanteenOrderGroup {
   canteenName: string;
   items: CartItem[];
   subtotal: number;
-  /** Unique 3-digit order number assigned at insert time (populated by saveOrderToSupabase). */
+  /** Unique database order number populated after successful checkout. */
   orderNumber?: string;
   /** Database order ID populated after the group is saved. */
   orderId?: string | number;

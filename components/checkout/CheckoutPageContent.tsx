@@ -10,7 +10,6 @@ import { formatPrice } from "@/lib/format";
 import {
   buildOrder,
   calculateDeliveryFee,
-  generateOrderNumber,
   groupItemsByCanteen,
 } from "@/lib/cart-utils";
 import { saveOrderToSupabase } from "@/lib/supabase";
@@ -30,6 +29,20 @@ const initialForm: CheckoutFormData = {
 };
 
 type FormErrors = Partial<Record<keyof CheckoutFormData, string>>;
+type PendingCheckout = {
+  fingerprint: string;
+  idempotencyKey: string;
+  trackingToken: string;
+};
+const PENDING_CHECKOUT_STORAGE_KEY = "unieats-pending-checkout";
+
+function createIdempotencyKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 export default function CheckoutPageContent() {
   const router = useRouter();
@@ -39,6 +52,7 @@ export default function CheckoutPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const submittedRef = useRef(false);
+  const pendingCheckoutRef = useRef<PendingCheckout | null>(null);
 
   const canteenGroups = useMemo(() => groupItemsByCanteen(items), [items]);
   const deliveryFee = calculateDeliveryFee(items, form.orderType);
@@ -100,29 +114,132 @@ export default function CheckoutPageContent() {
     submittedRef.current = true;
     setIsSubmitting(true);
 
-    const orderNumber = generateOrderNumber();
-    const order = buildOrder(orderNumber, form, items);
-    const trackingToken = createTrackingToken();
-    order.trackingToken = trackingToken;
+    const order = buildOrder("", form, items);
+    const fingerprint = JSON.stringify({
+      studentName: form.studentName.trim(),
+      phone: form.phone.replace(/\s/g, ""),
+      orderType: form.orderType,
+      deliveryLocation:
+        form.orderType === "delivery" ? form.deliveryLocation.trim() : null,
+      specialInstructions: form.specialInstructions.trim() || null,
+      paymentMethod: form.paymentMethod,
+      items: items.map((item) => ({
+        id: item.id,
+        menuItemKey: item.menuItemKey ?? null,
+        canteenSlug: item.canteenSlug,
+        quantity: item.quantity,
+        size: item.size ?? null,
+        addOnNames: (item.selectedAddOns ?? []).map((addOn) => addOn.name),
+      })),
+    });
+
+    let pendingCheckout = pendingCheckoutRef.current;
+    if (!pendingCheckout || pendingCheckout.fingerprint !== fingerprint) {
+      try {
+        const stored = sessionStorage.getItem(PENDING_CHECKOUT_STORAGE_KEY);
+        const parsed = stored ? (JSON.parse(stored) as PendingCheckout) : null;
+        pendingCheckout =
+          parsed?.fingerprint === fingerprint &&
+          typeof parsed.idempotencyKey === "string" &&
+          /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(parsed.idempotencyKey) &&
+          typeof parsed.trackingToken === "string" &&
+          parsed.trackingToken.length >= 32 &&
+          /^[A-Za-z0-9-]+$/.test(parsed.trackingToken)
+            ? parsed
+            : {
+                fingerprint,
+                idempotencyKey: createIdempotencyKey(),
+                trackingToken: createTrackingToken(),
+              };
+        sessionStorage.setItem(
+          PENDING_CHECKOUT_STORAGE_KEY,
+          JSON.stringify(pendingCheckout),
+        );
+        pendingCheckoutRef.current = pendingCheckout;
+      } catch (error) {
+        console.error("[UniEats] Could not initialize checkout retry protection:", error);
+        setOrderError(
+          "Secure checkout could not be started in this browser. Please enable session storage and try again.",
+        );
+        submittedRef.current = false;
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    order.trackingToken = pendingCheckout.trackingToken;
 
     // Do not show success or dispatch notifications unless persistence succeeds.
     let savedOrder: Awaited<ReturnType<typeof saveOrderToSupabase>>;
     try {
-      savedOrder = await saveOrderToSupabase(order);
+      savedOrder = await saveOrderToSupabase(order, {
+        idempotencyKey: pendingCheckout.idempotencyKey,
+        trackingToken: pendingCheckout.trackingToken,
+      });
     } catch (error) {
       const errMsg =
-        error instanceof Error ? error.message : "Unknown error";
-      console.error("[UniEats] Supabase order save failed:", errMsg);
+        error instanceof Error
+          ? error.message
+          : "We couldn't place your order. Your cart is saved; please try again.";
+      console.error("[UniEats] Checkout request failed:", errMsg);
       setOrderError(errMsg);
       submittedRef.current = false;
       setIsSubmitting(false);
       return;
     }
 
+    const originalItems = new Map(
+      order.canteenOrders.flatMap((group) =>
+        group.items.map((item) => [item.id, item] as const),
+      ),
+    );
+    order.canteenOrders = savedOrder.orders.map((savedGroup) => ({
+      canteenSlug: savedGroup.canteenSlug,
+      canteenName: savedGroup.canteenName,
+      orderId: savedGroup.id,
+      orderNumber: savedGroup.orderNumber,
+      subtotal: savedGroup.subtotal,
+      items: savedGroup.items.map((savedItem) => {
+        const original = originalItems.get(savedItem.clientLineId);
+        return {
+          ...(original ?? {
+            id: savedItem.clientLineId,
+            name: savedItem.itemName,
+            quantity: savedItem.quantity,
+            canteenSlug: savedGroup.canteenSlug,
+            canteenName: savedGroup.canteenName,
+            gradient: "",
+          }),
+          name: savedItem.itemName,
+          price: savedItem.unitPrice,
+          quantity: savedItem.quantity,
+        };
+      }),
+    }));
+    order.orderNumber = savedOrder.orders[0].orderNumber;
+    order.subtotal = savedOrder.orders.reduce(
+      (sum, savedGroup) => sum + savedGroup.subtotal,
+      0,
+    );
+    order.deliveryFee = savedOrder.orders.reduce(
+      (sum, savedGroup) => sum + savedGroup.deliveryCharge,
+      0,
+    );
+    order.grandTotal = savedOrder.orders.reduce(
+      (sum, savedGroup) => sum + savedGroup.totalAmount,
+      0,
+    );
+    order.timestamp = savedOrder.orders[0].createdAt;
+
     // Save the final order (with per-canteen numbers and database IDs) for the website confirmation page.
-    sessionStorage.setItem("unieats-last-order", JSON.stringify(order));
+    try {
+      sessionStorage.setItem("unieats-last-order", JSON.stringify(order));
+      sessionStorage.removeItem(PENDING_CHECKOUT_STORAGE_KEY);
+      pendingCheckoutRef.current = null;
+    } catch (error) {
+      console.error("[UniEats] Order was saved but confirmation storage failed:", error);
+    }
     rememberTrackingReference({
-      token: trackingToken,
+      token: pendingCheckout.trackingToken,
       orderIds: savedOrder.orderIds.map(String),
     });
 
@@ -376,7 +493,7 @@ export default function CheckoutPageContent() {
                 {(
                   [
                     { value: "cod" as const, label: "Cash on Delivery (COD)", sub: "Pay when your food is delivered" },
-                    { value: "online" as const, label: "Online Payment", sub: "Pay online before your order is delivered" },
+                    { value: "online" as const, label: "Online Payment", sub: "Online payments are not processed yet; please arrange payment with the canteen." },
                   ]
                 ).map((option) => (
                   <label

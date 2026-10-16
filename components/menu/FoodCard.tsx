@@ -53,6 +53,7 @@ export default function FoodCard({ item, showCanteenBadge = false }: FoodCardPro
     addItem(
       {
         id: finalId,
+        menuItemKey: item.id,
         name: item.name,
         price: currentPrice,
         canteenSlug: item.canteenSlug,

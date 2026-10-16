@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Order } from "@/lib/types";
+import { menuItems } from "@/lib/data/menus";
+import { DELIVERY_FEE_PER_CANTEEN } from "@/lib/constants";
+import type { CartItem, Order } from "@/lib/types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey =
@@ -18,17 +20,242 @@ export const supabase =
       })
     : null;
 
-/**
- * Checkout remains disabled until the database has a verified canonical menu
- * price source and matching item/canteen relationships.
- */
-export async function saveOrderToSupabase(
-  _order: Order,
-): Promise<{ orderId: string | number; orderIds: (string | number)[] }> {
-  void _order;
-  throw new Error(
-    "Secure checkout is temporarily unavailable: a verified server-side menu price source and matching database schema are required before orders can be accepted.",
+export interface SavedCheckoutItem {
+  clientLineId: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
+export interface SavedCheckoutGroup {
+  id: string;
+  orderNumber: string;
+  canteenId: string;
+  canteenSlug: string;
+  canteenName: string;
+  subtotal: number;
+  deliveryCharge: number;
+  totalAmount: number;
+  createdAt: string;
+  items: SavedCheckoutItem[];
+}
+
+export interface SavedCheckoutResult {
+  orderId: string;
+  orderIds: string[];
+  orders: SavedCheckoutGroup[];
+}
+
+function resolveMenuItemKey(item: CartItem): string {
+  if (item.menuItemKey) return item.menuItemKey;
+
+  const candidates = menuItems
+    .filter(
+      (menuItem) =>
+        menuItem.canteenSlug === item.canteenSlug &&
+        (item.id === menuItem.id || item.id.startsWith(`${menuItem.id}-`)),
+    )
+    .sort((left, right) => right.id.length - left.id.length);
+
+  if (candidates.length === 0) {
+    throw new Error(
+      "One or more cart items are no longer recognized. Remove them and add them again from the menu.",
+    );
+  }
+  return candidates[0].id;
+}
+
+function isSavedCheckoutItem(value: unknown): value is SavedCheckoutItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<SavedCheckoutItem>;
+  return (
+    typeof item.clientLineId === "string" &&
+    typeof item.itemName === "string" &&
+    typeof item.quantity === "number" &&
+    Number.isSafeInteger(item.quantity) &&
+    typeof item.unitPrice === "number" &&
+    Number.isFinite(item.unitPrice) &&
+    typeof item.subtotal === "number" &&
+    Number.isFinite(item.subtotal)
   );
+}
+
+function isSavedCheckoutGroup(value: unknown): value is SavedCheckoutGroup {
+  if (!value || typeof value !== "object") return false;
+  const order = value as Partial<SavedCheckoutGroup>;
+  return (
+    typeof order.id === "string" &&
+    typeof order.orderNumber === "string" &&
+    typeof order.canteenId === "string" &&
+    typeof order.canteenSlug === "string" &&
+    typeof order.canteenName === "string" &&
+    typeof order.subtotal === "number" &&
+    Number.isFinite(order.subtotal) &&
+    typeof order.deliveryCharge === "number" &&
+    Number.isFinite(order.deliveryCharge) &&
+    typeof order.totalAmount === "number" &&
+    Number.isFinite(order.totalAmount) &&
+    typeof order.createdAt === "string" &&
+    Array.isArray(order.items) &&
+    order.items.every(isSavedCheckoutItem)
+  );
+}
+
+function isConfirmedCheckout(
+  orders: SavedCheckoutGroup[],
+  items: Array<{ clientLineId: string; canteenSlug: string }>,
+  orderType: Order["orderType"],
+): boolean {
+  const expectedLineIds = new Set(items.map((item) => item.clientLineId));
+  const expectedCanteens = new Set(items.map((item) => item.canteenSlug));
+  const orderIds = new Set<string>();
+  const orderNumbers = new Set<string>();
+  const receivedLineIds = new Set<string>();
+  const receivedCanteens = new Set<string>();
+
+  if (orders.length !== expectedCanteens.size) return false;
+
+  return orders.every((order) => {
+    const createdAt = Date.parse(order.createdAt);
+    const groupSubtotal = order.items.reduce((sum, item) => sum + item.subtotal, 0);
+    const groupLineIds = new Set<string>();
+    const itemsValid = order.items.every((item) => {
+      if (
+        !expectedLineIds.has(item.clientLineId) ||
+        receivedLineIds.has(item.clientLineId) ||
+        groupLineIds.has(item.clientLineId) ||
+        !item.itemName ||
+        item.quantity <= 0 ||
+        item.unitPrice < 0 ||
+        item.subtotal < 0 ||
+        Math.abs(item.subtotal - item.unitPrice * item.quantity) >= 0.01
+      ) {
+        return false;
+      }
+      groupLineIds.add(item.clientLineId);
+      return true;
+    });
+    const expectedDelivery =
+      orderType === "delivery" ? DELIVERY_FEE_PER_CANTEEN : 0;
+    const isValid =
+      /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(order.id) &&
+      /^UNI-[0-9A-F]{8}-(?:[0-9A-F]{4}-){3}[0-9A-F]{12}$/.test(order.orderNumber) &&
+      Number.isFinite(createdAt) &&
+      expectedCanteens.has(order.canteenSlug) &&
+      !receivedCanteens.has(order.canteenSlug) &&
+      !orderIds.has(order.id) &&
+      !orderNumbers.has(order.orderNumber) &&
+      itemsValid &&
+      order.subtotal >= 0 &&
+      order.deliveryCharge === expectedDelivery &&
+      order.totalAmount >= 0 &&
+      Math.abs(order.subtotal - groupSubtotal) < 0.01 &&
+      Math.abs(order.totalAmount - order.subtotal - order.deliveryCharge) < 0.01;
+
+    if (!isValid) return false;
+
+    orderIds.add(order.id);
+    orderNumbers.add(order.orderNumber);
+    receivedCanteens.add(order.canteenSlug);
+    groupLineIds.forEach((lineId) => receivedLineIds.add(lineId));
+    return true;
+  }) && receivedLineIds.size === expectedLineIds.size;
+}
+
+export async function saveOrderToSupabase(
+  order: Order,
+  options: { idempotencyKey: string; trackingToken: string },
+): Promise<SavedCheckoutResult> {
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Checkout is temporarily unavailable. Please try again later.");
+  }
+
+  const items = order.canteenOrders.flatMap((group) =>
+    group.items.map((item) => ({
+      clientLineId: item.id,
+      menuItemKey: resolveMenuItemKey(item),
+      canteenSlug: item.canteenSlug,
+      quantity: item.quantity,
+      size: item.size ?? null,
+      addOnNames: (item.selectedAddOns ?? []).map((addOn) => addOn.name),
+    })),
+  );
+
+  let response: Response;
+  try {
+    response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentName: order.studentName,
+        phone: order.phone,
+        orderType: order.orderType,
+        deliveryLocation: order.deliveryLocation ?? "",
+        specialInstructions: order.specialInstructions ?? "",
+        paymentMethod: order.paymentMethod,
+        trackingToken: options.trackingToken,
+        idempotencyKey: options.idempotencyKey,
+        items,
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error(
+      "We couldn't confirm your order just yet. Your cart is saved; please retry checkout.",
+    );
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(
+      "We couldn't confirm your order just yet. Your cart is saved; please retry checkout.",
+    );
+  }
+
+  if (!response.ok || !payload || typeof payload !== "object") {
+    const error =
+      payload && typeof payload === "object" && "error" in payload
+        ? (payload as { error?: unknown }).error
+        : null;
+    throw new Error(
+      typeof error === "string"
+        ? error
+        : "We couldn't place your order. Your cart is saved; please try again.",
+    );
+  }
+
+  if (!payload || typeof payload !== "object") {
+    throw new Error(
+      "We couldn't confirm your order just yet. Your cart is saved; please retry checkout.",
+    );
+  }
+  const result = payload as Partial<SavedCheckoutResult>;
+  if (
+    !Array.isArray(result.orders) ||
+    result.orders.length === 0 ||
+    !result.orders.every(isSavedCheckoutGroup) ||
+    !isConfirmedCheckout(
+      result.orders,
+      items.map((item) => ({
+        clientLineId: item.clientLineId,
+        canteenSlug: item.canteenSlug,
+      })),
+      order.orderType,
+    )
+  ) {
+    throw new Error(
+      "We couldn't confirm your order just yet. Your cart is saved; please retry checkout.",
+    );
+  }
+
+  return {
+    orderId: result.orders[0].id,
+    orderIds: result.orders.map((savedOrder) => savedOrder.id),
+    orders: result.orders,
+  };
 }
 
 // ---------------------------------------------------------------------------
