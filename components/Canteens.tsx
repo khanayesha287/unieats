@@ -9,7 +9,7 @@ export default function Canteens() {
 
   return (
     <section
-      className="relative overflow-hidden bg-gradient-to-b from-white via-[#FAF7FF] to-[#F3EDFF] py-20 lg:py-28"
+      className="relative overflow-hidden bg-gradient-to-b from-white via-[#FAF7FF] to-[#F3EDFF] pt-10 pb-8 sm:pt-12 sm:pb-10 lg:pt-14 lg:pb-12"
       aria-labelledby="canteens-heading"
     >
       <div className="pointer-events-none absolute -left-24 top-16 h-64 w-64 rounded-full bg-[#6C2BD9]/10 blur-3xl" aria-hidden />
@@ -66,7 +66,7 @@ export default function Canteens() {
           })}
         </div>
 
-        <div className="mt-12 text-center">
+        <div className="mt-8 text-center sm:mt-9">
           <Link
             href="/canteens"
             className="inline-flex rounded-full border border-[#6C2BD9]/30 px-6 py-2.5 text-sm font-semibold text-[#6C2BD9] transition-all hover:bg-[#F3EDFF]"

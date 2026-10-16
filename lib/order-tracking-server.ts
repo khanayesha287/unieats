@@ -95,10 +95,8 @@ export async function queryOrdersByIds(
 
 /**
  * Resolves which of the requested order ids belong to the given tracking
- * token. Mirrors the exact verification rules of the tracking REST endpoint,
- * including the legacy-schema fallback when tracking_token_hash is absent.
- * Returns null when Supabase is unconfigured; empty array means the token
- * matched nothing (invalid token).
+ * token. Missing hash storage is an error; order IDs alone do not verify access.
+ * An empty array means the token matched nothing (invalid token).
  */
 export async function resolveTokenOrderIds(
   client: NonNullable<ReturnType<typeof getServerSupabase>>,
@@ -106,21 +104,10 @@ export async function resolveTokenOrderIds(
   orderIds: string[],
 ): Promise<{ verifiedIds: string[]; error: { message?: string; code?: string } | null }> {
   const tokenHash = createHash("sha256").update(token, "utf8").digest("hex");
-
   const primary = await queryOrdersByIds(client, orderIds, tokenHash);
-  let orders: any[];
-  let error: { message?: string; code?: string } | null = null;
-
-  if (primary.error && isMissingColumnError(primary.error)) {
-    // Legacy schema without tracking_token_hash: id-only matching (see REST route).
-    const fallback = await queryOrdersByIds(client, orderIds, null);
-    orders = fallback.data;
-    error = fallback.error;
-  } else {
-    orders = primary.data;
-    error = primary.error;
-  }
-
-  if (error) return { verifiedIds: [], error };
-  return { verifiedIds: orders.map((order: any) => String(order.id)), error: null };
+  if (primary.error) return { verifiedIds: [], error: primary.error };
+  return {
+    verifiedIds: primary.data.map((order: any) => String(order.id)),
+    error: null,
+  };
 }

@@ -1,10 +1,9 @@
 import Image from "next/image";
-import Link from "next/link";
 
 export default function Hero() {
   return (
     <section
-      className="relative overflow-hidden bg-gradient-to-br from-[#FAF7FF] via-white to-[#F3EDFF] pt-28 pb-20 lg:pt-36 lg:pb-28"
+      className="relative overflow-hidden bg-gradient-to-br from-[#FAF7FF] via-white to-[#F3EDFF] pt-24 pb-10 sm:pb-12 lg:pt-32 lg:pb-14"
       aria-labelledby="hero-heading"
     >
       <div
@@ -40,8 +39,8 @@ export default function Hero() {
 
           <div className="relative mt-7 aspect-[16/9] w-full max-w-2xl overflow-hidden rounded-2xl bg-white/70 shadow-xl shadow-[#6C2BD9]/10 ring-1 ring-[#6C2BD9]/10">
             <Image
-              src="/images/hot-potato-poster.png"
-              alt="Hot Potato Canteen poster"
+              src="/img/cookies-poster.jpg"
+              alt="Cookies poster"
               fill
               priority
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 672px"
@@ -49,12 +48,11 @@ export default function Hero() {
             />
           </div>
 
-          <Link
-            href="/menu/hot-potato"
-            className="mt-5 inline-flex items-center justify-center rounded-full bg-[#6C2BD9] px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#6C2BD9]/25 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#F4C542] hover:text-[#2E1065] hover:shadow-[#F4C542]/30"
+          <span
+            className="mt-5 inline-flex items-center justify-center rounded-full border border-[#F4C542]/60 bg-white/90 px-8 py-3.5 text-sm font-bold tracking-wide text-[#6C2BD9] shadow-lg shadow-[#6C2BD9]/10 ring-1 ring-[#6C2BD9]/10"
           >
-            Order Now
-          </Link>
+            Coming Soon...
+          </span>
 
         </div>
       </div>

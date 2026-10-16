@@ -13,6 +13,9 @@ export const metadata: Metadata = createMetadata({
   path: "/",
 });
 
+const FeaturedMenu = dynamic(() => import("@/components/FeaturedMenu"), {
+  loading: () => <SectionSkeleton />,
+});
 const CTA = dynamic(() => import("@/components/CTA"), {
   loading: () => <SectionSkeleton />,
 });
@@ -23,7 +26,7 @@ const Canteens = dynamic(() => import("@/components/Canteens"), {
 function SectionSkeleton() {
   return (
     <div
-      className="mx-auto max-w-7xl animate-pulse px-4 py-20 sm:px-6 lg:px-8"
+      className="mx-auto max-w-7xl animate-pulse px-4 py-10 sm:px-6 sm:py-12 lg:px-8 lg:py-16"
       aria-hidden
     >
       <div className="mx-auto mb-10 h-10 max-w-md rounded-xl bg-gray-200" />
@@ -40,9 +43,10 @@ export default function Home() {
   return (
     <>
       <Navbar />
-      <main>
+      <main className="flex-1">
         <Hero />
         <Canteens />
+        <FeaturedMenu />
         <CTA />
         <Testimonials />
       </main>

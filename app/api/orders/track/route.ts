@@ -5,7 +5,6 @@ import { NextResponse } from "next/server";
 import type { TrackedOrder } from "@/lib/order-tracking";
 import {
   getServerSupabase,
-  isInvalidIdTypeError,
   isMissingColumnError,
   parseRequest,
   queryOrdersByIds,
@@ -38,22 +37,16 @@ export async function POST(request: Request) {
   const primary = await queryOrdersByIds(client, parsed.orderIds, tokenHash);
 
   if (primary.error && isMissingColumnError(primary.error)) {
-    // Legacy schema without the tracking_token_hash column: the hash cannot
-    // be verified (rows were saved with a dropped/absent hash). Fall back to
-    // id-only matching so tracking stays functional, and tell the operator
-    // to apply the migration to restore hash verification.
-    console.warn(
-      "[UniEats Tracking] orders.tracking_token_hash column is missing on this schema. " +
-        "Falling back to id-only order matching WITHOUT token verification. " +
-        "Run supabase-migrations/add-order-tracking-workflow-security.sql to restore verification.",
+    console.error(
+      "[UniEats Tracking] tracking_token_hash is missing; refusing unverified order lookup.",
     );
-    const fallback = await queryOrdersByIds(client, parsed.orderIds, null);
-    if (fallback.error) {
-      ordersError = fallback.error;
-    } else {
-      orders = fallback.data;
-    }
-  } else if (primary.error) {
+    return NextResponse.json(
+      { error: "Order tracking is temporarily unavailable." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  if (primary.error) {
     ordersError = primary.error;
   } else {
     orders = primary.data;
@@ -68,10 +61,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to load order tracking." }, { status: 500 });
   }
 
-  // Partial-match tolerant: return every hash-verified order that matched.
-  // A strict all-or-nothing check here caused permanently stale tracking for
-  // multi-canteen orders whenever one per-canteen row was deleted or saved
-  // without a hash. 404 only when nothing matched at all (invalid token).
+  // Return every hash-verified order that matched; never fall back to ID-only
+  // lookup because order IDs are not a substitute for the tracking token.
   if (orders.length === 0) {
     return NextResponse.json({ error: "Order tracking access was not valid." }, { status: 404 });
   }
