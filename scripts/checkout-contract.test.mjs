@@ -47,6 +47,11 @@ const menuSeedVerification = read(
 const securityMigration = read(
   "supabase-migrations/20261016000000_checkout_rls_and_grants.sql",
 );
+const riderWorkflowMigration = read(
+  "supabase-migrations/20261016110000_rider_pending_delivery_workflow.sql",
+);
+const riderPortal = read("components/driver/DriverPortalContent.tsx");
+const canteenPortal = read("components/canteen/CanteenPortalContent.tsx");
 const menus = read("lib/data/menus.ts");
 
 // ---------------------------------------------------------------------------
@@ -657,6 +662,408 @@ test("security migration is fail-closed and least-privilege", () => {
     securityMigration.includes(
       "GRANT SELECT ON TABLE public.menu_items TO anon, authenticated;",
     ),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Student delivery checkout -> Rider Portal lifecycle
+// ---------------------------------------------------------------------------
+test("student delivery checkout creates pending orders and order items", () => {
+  assert.match(
+    checkoutMigration,
+    /INSERT INTO public\.orders\s*\([\s\S]*?order_type,[\s\S]*?status,[\s\S]*?\)\s*VALUES\s*\([\s\S]*?p_order_type,[\s\S]*?'pending'/,
+  );
+  assert.match(
+    checkoutMigration,
+    /INSERT INTO public\.order_items\s*\([\s\S]*?order_id,[\s\S]*?menu_item_id,[\s\S]*?item_name,[\s\S]*?quantity,[\s\S]*?price,[\s\S]*?subtotal/,
+  );
+});
+
+test("Rider Portal includes unassigned pending deliveries but excludes pickup", () => {
+  assert.ok(riderPortal.includes('.eq("order_type", "delivery")'));
+  assert.ok(riderPortal.includes("driver_id.is.null,driver_id.eq.${profile.driver_id}"));
+  assert.match(riderPortal, /const RIDER_STATUSES = \[[\s\S]*?"pending"[\s\S]*?"confirmed"/);
+  assert.ok(
+    riderWorkflowMigration.includes("AND status = 'pending'"),
+    "RLS must expose unassigned pending deliveries to mapped riders",
+  );
+  assert.ok(
+    riderWorkflowMigration.includes("o.status = 'pending'"),
+    "order-item RLS must expose items for unassigned pending deliveries",
+  );
+});
+
+test("rider migration preserves assigned-rider updates and admin delete policies", () => {
+  assert.ok(
+    riderWorkflowMigration.includes("policyname = 'orders_staff_update'"),
+    "preflight must require the existing orders update policy",
+  );
+  assert.ok(
+    riderWorkflowMigration.includes("qual ILIKE '%current_staff_driver_id%'")
+      && riderWorkflowMigration.includes("with_check ILIKE '%current_staff_driver_id%'"),
+    "preflight must require mapped-rider scope for both update checks",
+  );
+  assert.ok(
+    riderWorkflowMigration.includes("qual ILIKE '%canteen_owner%'")
+      && riderWorkflowMigration.includes("with_check ILIKE '%canteen_owner%'"),
+    "preflight must require canteen-owner scope for both update checks",
+  );
+  assert.ok(
+    riderWorkflowMigration.includes("policyname = 'orders_admin_delete'")
+      && riderWorkflowMigration.includes("policyname = 'order_items_admin_delete'"),
+    "preflight must require existing admin-only delete policies",
+  );
+  assert.doesNotMatch(
+    riderWorkflowMigration,
+    /(?:DROP|CREATE)\s+POLICY\s+(?:IF\s+EXISTS\s+)?orders_staff_update/i,
+    "the rider migration must not replace the assigned-rider update policy",
+  );
+  assert.doesNotMatch(
+    riderWorkflowMigration,
+    /(?:DROP|CREATE)\s+POLICY\s+(?:IF\s+EXISTS\s+)?(?:orders_admin_delete|order_items_admin_delete)/i,
+    "the rider migration must not replace admin delete policies",
+  );
+});
+
+test("Rider Portal polls and subscribes to order changes", () => {
+  assert.ok(riderPortal.includes("setInterval("));
+  assert.ok(riderPortal.includes("}, 15000)"));
+  assert.ok(riderPortal.includes('"postgres_changes"'));
+  assert.ok(riderPortal.includes('table: "orders"'));
+  assert.ok(riderPortal.includes('table: "order_items"'));
+});
+
+test("rider claim atomically confirms a pending delivery for an active mapped rider", () => {
+  const claimStart = riderWorkflowMigration.indexOf(
+    "CREATE OR REPLACE FUNCTION public.claim_delivery_order(p_order_id UUID)",
+  );
+  const claimEnd = riderWorkflowMigration.indexOf("$function$;", claimStart);
+  assert.ok(claimStart !== -1 && claimEnd > claimStart);
+  const claim = riderWorkflowMigration.slice(claimStart, claimEnd);
+  assert.ok(claim.includes("RETURNS TABLE(order_id UUID, order_status TEXT, accepted_at TIMESTAMPTZ)"));
+  assert.ok(claim.includes("SECURITY DEFINER"));
+  assert.ok(claim.includes("SET search_path = pg_catalog, public, pg_temp"));
+  assert.ok(claim.includes("auth.role(), '') <> 'authenticated'"));
+  assert.ok(claim.includes("public.current_staff_role() IS DISTINCT FROM 'driver'"));
+  assert.ok(claim.includes("public.current_staff_driver_id()"));
+  assert.ok(claim.includes("SET driver_id = v_driver_id"));
+  assert.ok(claim.includes("status = 'confirmed'"));
+  assert.ok(claim.includes("driver_accepted_at = statement_timestamp()"));
+  assert.ok(claim.includes("o.order_type = 'delivery'"));
+  assert.ok(claim.includes("o.status = 'pending'"));
+  assert.ok(claim.includes("o.driver_id IS NULL"));
+  assert.ok(claim.includes("o.driver_accepted_at IS NULL"));
+  assert.ok(
+    riderWorkflowMigration.replace(/\s+/g, " ").includes(
+      "GRANT EXECUTE ON FUNCTION public.claim_delivery_order(UUID) TO authenticated;",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.replace(/\s+/g, " ").includes(
+      "REVOKE ALL ON FUNCTION public.claim_delivery_order(UUID) FROM PUBLIC, anon;",
+    ),
+  );
+});
+
+test("rider workflow protects order details and allows confirmed-to-delivered", () => {
+  const validatorStart = riderWorkflowMigration.indexOf(
+    "CREATE OR REPLACE FUNCTION public.validate_order_workflow_update()",
+  );
+  const validatorEnd = riderWorkflowMigration.indexOf("$function$;", validatorStart);
+  assert.ok(validatorStart !== -1 && validatorEnd > validatorStart);
+  const validator = riderWorkflowMigration.slice(validatorStart, validatorEnd);
+  assert.ok(validator.includes("SECURITY INVOKER"));
+  assert.ok(validator.includes("SET search_path = pg_catalog, public, pg_temp"));
+  assert.ok(!validator.includes("SECURITY DEFINER"));
+  assert.match(
+    validator,
+    /v_staff_role := public\.current_staff_role\(\);\s+IF v_staff_role IS NULL AND auth\.uid\(\) IS NULL THEN\s+RETURN NEW;\s+END IF;\s+v_driver_id := public\.current_staff_driver_id\(\);/,
+    "server-side updates with no staff role and no auth UID must bypass staff validation before rider lookup",
+  );
+  assert.ok(
+    validator.includes("ELSIF v_staff_role IS DISTINCT FROM 'admin' THEN"),
+    "admin updates must retain the validator bypass",
+  );
+  assert.ok(validator.includes("OLD.status = 'pending'"));
+  assert.ok(validator.includes("NEW.status = 'confirmed'"));
+  assert.ok(validator.includes("NEW.driver_id = v_driver_id"));
+  assert.ok(validator.includes("OLD.driver_id IS NULL"));
+  assert.ok(validator.includes("NEW.driver_accepted_at IS NOT NULL"));
+  assert.match(
+    validator,
+    /WHEN 'confirmed' THEN\s+NEW\.confirmed_at := COALESCE\(OLD\.confirmed_at, statement_timestamp\(\)\)/,
+  );
+  assert.match(
+    validator,
+    /WHEN 'delivered' THEN\s+NEW\.delivered_at := COALESCE\(OLD\.delivered_at, statement_timestamp\(\)\)/,
+  );
+  assert.match(
+    validator,
+    /OLD\.status = 'confirmed'\s+AND NEW\.status = 'delivered'/,
+  );
+  assert.ok(validator.includes("NEW.driver_id IS DISTINCT FROM OLD.driver_id"));
+  assert.ok(validator.includes("public.current_staff_driver_id()"));
+  assert.match(
+    validator,
+    /to_jsonb\(NEW\)\s*-\s*ARRAY\[[\s\S]*?\]\)\s*IS DISTINCT FROM\s*\(to_jsonb\(OLD\)\s*-\s*ARRAY\[/,
+  );
+  for (const protectedField of [
+    "total_amount",
+    "student_name",
+    "phone",
+    "canteen_id",
+    "order_type",
+  ]) {
+    assert.ok(
+      !validator.includes(`'${protectedField}'`),
+      `${protectedField} must not be in the rider/canteen mutable-field allow lists`,
+    );
+  }
+  assert.ok(validator.includes("NEW.delivered_at := COALESCE(OLD.delivered_at, statement_timestamp())"));
+  assert.ok(validator.includes("OLD.order_type = 'delivery' OR NEW.order_type = 'delivery'"));
+  assert.ok(validator.includes("Delivery orders are handled by the assigned rider"));
+});
+
+test("Rider Portal renders only Confirm Order and Order Delivered as order actions", () => {
+  assert.ok(riderPortal.includes('"Confirm Order"'));
+  assert.ok(riderPortal.includes('"Order Delivered"'));
+  assert.ok(!riderPortal.includes('"Start Delivery"'));
+  assert.ok(!riderPortal.includes('"Start Preparing"'));
+  assert.ok(!riderPortal.includes('"Mark Ready"'));
+  assert.ok(riderPortal.includes('order.status !== "pending" || order.driver_id != null'));
+  assert.ok(riderPortal.includes('supabaseAuth.rpc("claim_delivery_order"'));
+  assert.match(
+    riderPortal,
+    /\.update\(\{ status: nextStatus \}\)[\s\S]*?\.eq\("driver_id", driverId\)[\s\S]*?\.eq\("status", order\.status\)/,
+  );
+  assert.ok(riderPortal.includes('nextStatus: "delivered"'));
+});
+
+test("Canteen Portal keeps canonical orders visible but routes delivery actions to riders", () => {
+  assert.ok(canteenPortal.includes('supabaseAuth.from("orders").select("*")'));
+  assert.ok(canteenPortal.includes('o.status === "pending"'));
+  assert.ok(canteenPortal.includes('o.status === "confirmed"'));
+  assert.ok(canteenPortal.includes('order.order_type !== "delivery" && action === "accept"'));
+  assert.ok(canteenPortal.includes('Delivery orders are handled by the Rider Portal.'));
+  assert.ok(
+    riderWorkflowMigration.includes("public.current_staff_role() = 'canteen_owner'"),
+    "the updated order policies must retain canteen-owner visibility",
+  );
+});
+
+test("rider workflow migration preserves checkout and WhatsApp triggers", () => {
+  for (const trigger of [
+    "validate_order_workflow_update",
+    "orders_enqueue_whatsapp_order_notification_queue",
+    "orders_remove_whatsapp_order_notification_queue",
+  ]) {
+    assert.ok(riderWorkflowMigration.includes(trigger), `missing preflight for ${trigger}`);
+  }
+  assert.ok(!/DROP\s+TRIGGER/i.test(riderWorkflowMigration));
+  assert.ok(!/CREATE\s+(?:OR REPLACE\s+)?TRIGGER/i.test(riderWorkflowMigration));
+  assert.ok(!/INSERT\s+INTO\s+public\.orders/i.test(riderWorkflowMigration));
+  assert.ok(!/INSERT\s+INTO\s+public\.order_items/i.test(riderWorkflowMigration));
+  assert.ok(riderWorkflowMigration.includes("BEGIN;"));
+  assert.ok(riderWorkflowMigration.includes("COMMIT;"));
+});
+
+test("rider migration preflights all referenced schema columns and compatible types", () => {
+  for (const requiredColumn of [
+    "('orders', 'canteen_id')",
+    "('orders', 'preparing_at')",
+    "('orders', 'ready_at')",
+    "('orders', 'out_for_delivery_at')",
+    "('orders', 'delivered_at')",
+    "('orders', 'updated_at')",
+    "('order_items', 'order_id')",
+    "('canteens', 'id')",
+    "('staff_profiles', 'id')",
+    "('staff_profiles', 'role')",
+    "('staff_profiles', 'active')",
+    "('staff_profiles', 'canteen_id')",
+    "('staff_profiles', 'driver_id')",
+    "('driver', 'id')",
+    "('driver', 'status')",
+  ]) {
+    assert.ok(
+      riderWorkflowMigration.includes(requiredColumn),
+      `preflight must require ${requiredColumn}`,
+    );
+  }
+
+  for (const expectedType of [
+    "column_name = 'order_id'",
+    "column_name IN ('id', 'canteen_id', 'driver_id')",
+    "column_name IN ('order_type', 'status', 'role')",
+    "column_name = 'active'",
+    "'confirmed_at'",
+    "'preparing_at'",
+    "'ready_at'",
+    "'out_for_delivery_at'",
+    "'delivered_at'",
+    "'updated_at'",
+    "udt_name <> 'uuid'",
+    "udt_name <> 'text'",
+    "udt_name <> 'bool'",
+    "udt_name <> 'timestamptz'",
+  ]) {
+    assert.ok(
+      riderWorkflowMigration.includes(expectedType),
+      `preflight must verify compatible type: ${expectedType}`,
+    );
+  }
+
+  assert.match(
+    riderWorkflowMigration,
+    /table_name = 'staff_profiles'\s+AND column_name = 'canteen_id'\s+AND udt_name <> 'uuid'/,
+    "preflight must require staff_profiles.canteen_id to be UUID-typed",
+  );
+
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "order_items.order_id must have the same type as orders.id.",
+    ),
+    "the parent and child order keys must have compatible types",
+  );
+});
+
+test("rider migration postflight verifies visibility, scoped updates, and live triggers", () => {
+  for (const assertion of [
+    "Rider workflow migration failed postflight: staff SELECT policies must preserve admin/canteen scope and expose only mapped pending delivery orders to riders.",
+    "Rider workflow migration failed postflight: the existing RLS-scoped orders UPDATE policy must remain intact.",
+    "Rider workflow migration failed postflight: the workflow and WhatsApp triggers must remain enabled and attached.",
+    "Rider workflow migration failed postflight: staff helper ownership, SECURITY DEFINER settings, search_path, or grants changed unexpectedly.",
+  ]) {
+    assert.ok(
+      riderWorkflowMigration.includes(assertion),
+      `missing fail-closed postflight assertion: ${assertion}`,
+    );
+  }
+  assert.ok(riderWorkflowMigration.includes("AND qual ILIKE '%driver_id IS NULL%'"));
+  assert.ok(riderWorkflowMigration.includes("AND qual ILIKE '%status = ''pending''%'"));
+  assert.ok(riderWorkflowMigration.includes("AND qual ILIKE '%current_staff_driver_id() IS NOT NULL%'"));
+  assert.ok(riderWorkflowMigration.includes("AND NOT ('anon' = ANY(roles))"));
+});
+
+test("rider migration preflight fails closed on missing or untrusted definer functions", () => {
+  assert.match(
+    riderWorkflowMigration,
+    /IF NOT FOUND THEN\s+RAISE EXCEPTION\s+'Rider workflow migration blocked: claim_delivery_order\(uuid\) is missing\.';\s+END IF;\s+IF NOT v_claim\.prosecdef/,
+  );
+  assert.match(
+    riderWorkflowMigration,
+    /IF NOT FOUND THEN\s+RAISE EXCEPTION\s+'Rider workflow migration blocked: the order workflow trigger function is missing\.';\s+END IF;\s+IF v_workflow\.prosecdef IS DISTINCT FROM FALSE/,
+  );
+  assert.ok(riderWorkflowMigration.includes("pg_get_userbyid(p.proowner) = 'postgres'"));
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "v_workflow.owner_name IS DISTINCT FROM 'postgres'",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "the order workflow trigger function must remain SECURITY INVOKER and postgres-owned",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "the live order workflow trigger search_path differs from the verified public, pg_temp configuration.",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "validate_order_workflow_update() must remain postgres-owned SECURITY INVOKER with the hardened search_path.",
+    ),
+  );
+  assert.ok(riderWorkflowMigration.includes("AND (t.tgtype & 1) = 1"));
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "to_regprocedure('public.current_staff_canteen_id()')",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "p.proconfig @> ARRAY['search_path=public']::text[]",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes("current_staff_canteen_id() must be executable by authenticated and unavailable to anon."),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "public must not be writable by anon or authenticated",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "OR v_canteen_function_ok IS DISTINCT FROM TRUE",
+    ),
+  );
+  for (const verifiedDriverMappingPredicate of [
+    "sp.id = auth.uid()",
+    "sp.role = ''driver''",
+    "sp.active = true",
+    "sp.active is true",
+    "d.id = sp.driver_id",
+    "d.status = ''active''",
+  ]) {
+    assert.ok(
+      riderWorkflowMigration.includes(verifiedDriverMappingPredicate),
+      `preflight must verify mapped active rider predicate: ${verifiedDriverMappingPredicate}`,
+    );
+  }
+  assert.match(
+    riderWorkflowMigration,
+    /lower\(p\.prosrc\) LIKE '%sp\.active = true%'\s+OR lower\(p\.prosrc\) LIKE '%sp\.active is true%'/,
+    "driver helper preflight must accept the verified IS TRUE expression without dropping mapping checks",
+  );
+  assert.match(
+    riderWorkflowMigration,
+    /has_table_privilege\(\s+v_claim\.owner_oid,\s+'public\.orders',\s+'UPDATE'\s+\)/,
+    "claim definer owner must have effective UPDATE privilege",
+  );
+  assert.match(
+    riderWorkflowMigration,
+    /r\.rolbypassrls\s+OR \(c\.relowner = v_claim\.owner_oid AND NOT c\.relforcerowsecurity\)/,
+    "claim definer must bypass forced RLS or own a table without FORCE RLS",
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "claim_delivery_order() owner must have effective UPDATE privilege and bypass orders RLS",
+    ),
+    "unsafe claim execution context must fail before replacement DDL",
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "search_path=pg_catalog, public, pg_temp",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "claim_delivery_order(uuid) must remain postgres-owned SECURITY DEFINER with the hardened search_path.",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "validate_order_workflow_update() must remain postgres-owned SECURITY INVOKER with the hardened search_path.",
+    ),
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "current_staff_role() and current_staff_driver_id() must be executable by authenticated and unavailable to anon.",
+    ),
+    "invoker workflow must retain authenticated access to the helpers it calls",
+  );
+  assert.ok(
+    riderWorkflowMigration.includes(
+      "authenticated must retain the existing RLS-scoped orders UPDATE privilege, unavailable to anon.",
+    ),
+    "rider status updates require the existing authenticated UPDATE privilege",
+  );
+  assert.doesNotMatch(
+    riderWorkflowMigration,
+    /GRANT\s+[^;]*\bON\s+TABLE\s+public\.orders\b/i,
+    "rider migration must not broaden orders table privileges",
   );
 });
 

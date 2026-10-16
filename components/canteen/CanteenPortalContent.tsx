@@ -287,7 +287,6 @@ function CanteenPortalContentInner() {
   }, [profile?.canteen_id, profile?.role, requestedCanteenId, router]);
 
   const loadData = useCallback(async (silent = false) => {
-    if (!silent) setIsLoading(true);
     const data = await fetchPortalData();
     setCanteens(data.canteens);
     setOrders(data.orders);
@@ -297,7 +296,13 @@ function CanteenPortalContentInner() {
   }, []);
 
   useEffect(() => {
-    void loadData();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void loadData();
+    });
+    return () => {
+      active = false;
+    };
   }, [loadData]);
 
   // Polling every 15 s — silent refresh (no loading flash)
@@ -319,11 +324,6 @@ function CanteenPortalContentInner() {
       .subscribe();
     return () => { if (supabaseAuth) void supabaseAuth.removeChannel(channel); };
   }, [loadData]);
-
-  const canteenMap = useMemo(
-    () => Object.fromEntries(canteens.map((c) => [String(c.id), c])) as Record<string, CanteenRecord>,
-    [canteens],
-  );
 
   const requestedCanteen = canteens.find(
     (canteen) => String(canteen.id) === requestedCanteenId,
@@ -411,9 +411,6 @@ function CanteenPortalContentInner() {
   const renderOrderCard = (order: PortalOrder, action: "accept" | "prepare" | "ready" | null) => {
     const orderItems = itemsByOrder[String(order.id)] ?? [];
     const isNew = order.status === "pending" && isRecentOrder(order.created_at);
-    const canteenName = order.canteen_id
-      ? canteenMap[String(order.canteen_id)]?.name ?? "Unknown"
-      : "Unknown";
     const paymentLabel =
       order.payment_method === "cod"
         ? "Cash on Delivery"
@@ -504,7 +501,12 @@ function CanteenPortalContentInner() {
         {/* Action button */}
         {action && (
           <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
-            {action === "accept" && (
+            {order.order_type === "delivery" ? (
+              <p className="text-center text-xs font-medium text-slate-600">
+                Delivery orders are handled by the Rider Portal.
+              </p>
+            ) : null}
+            {order.order_type !== "delivery" && action === "accept" && (
               <button
                 type="button"
                 disabled={isUpdating}
@@ -514,7 +516,7 @@ function CanteenPortalContentInner() {
                 {isUpdating ? "Updating..." : "Accept Order"}
               </button>
             )}
-            {action === "prepare" && (
+            {order.order_type !== "delivery" && action === "prepare" && (
               <button
                 type="button"
                 disabled={isUpdating}
@@ -524,7 +526,7 @@ function CanteenPortalContentInner() {
                 {isUpdating ? "Updating..." : "Start Preparing"}
               </button>
             )}
-            {action === "ready" && (
+            {order.order_type !== "delivery" && action === "ready" && (
               <button
                 type="button"
                 disabled={isUpdating}

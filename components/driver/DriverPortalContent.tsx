@@ -2,7 +2,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildStatusUpdatePayload } from "@/lib/supabase";
 import { supabaseAuth } from "@/lib/supabase-auth";
 import { useAuth } from "@/components/providers/AuthProvider";
 
@@ -43,12 +42,13 @@ interface DriverOrder {
 const ACTIVE_STATUSES = [
   "pending",
   "confirmed",
-  "preparing",
   "ready",
   "out_for_delivery",
 ];
 
 const RIDER_STATUSES = [
+  "pending",
+  "confirmed",
   "ready",
   "out_for_delivery",
   "delivered",
@@ -73,7 +73,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
+  pending: "Incoming",
   confirmed: "Confirmed",
   preparing: "Preparing",
   ready: "Ready for Delivery",
@@ -277,7 +277,6 @@ export default function DriverPortalContent() {
         !profile ||
         (profile.role === "driver" && !profile.driver_id)
       ) {
-        if (!silent) setIsLoading(false);
         return false;
       }
 
@@ -393,11 +392,16 @@ export default function DriverPortalContent() {
       !supabaseAuth ||
       (profile.role === "driver" && !profile.driver_id)
     ) {
-      if (!authLoading) setIsLoading(false);
       return;
     }
 
-    void loadData();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void loadData();
+    });
+    return () => {
+      active = false;
+    };
   }, [authLoading, profile, loadData]);
 
   // Refresh incoming orders every 15 seconds.
@@ -496,7 +500,7 @@ export default function DriverPortalContent() {
 
   const updateStatus = async (
     orderId: string | number,
-    nextStatus: "out_for_delivery" | "delivered",
+    nextStatus: "delivered",
   ) => {
     if (updateInProgress.current) return;
 
@@ -515,10 +519,9 @@ export default function DriverPortalContent() {
       !order ||
       !isAssignedToCurrentDriver(order) ||
       !(
-        (order.status === "ready" &&
-          nextStatus === "out_for_delivery") ||
-        (order.status === "out_for_delivery" &&
-          nextStatus === "delivered")
+        (order.status === "confirmed" && nextStatus === "delivered") ||
+        (order.status === "ready" && nextStatus === "delivered") ||
+        (order.status === "out_for_delivery" && nextStatus === "delivered")
       )
     ) {
       setError("Only your assigned deliveries at the correct stage can be updated.");
@@ -532,48 +535,14 @@ export default function DriverPortalContent() {
 
     try {
       const driverId = String(profile.driver_id);
-
-      const { data: existing, error: timestampError } =
-        await supabaseAuth
-          .from("orders")
-          .select("ready_at,out_for_delivery_at,delivered_at")
-          .eq("id", orderId)
-          .eq("driver_id", driverId)
-          .maybeSingle();
-
-      if (timestampError) {
-        console.error(
-          "[UniEats Driver] Timestamp lookup failed:",
-          timestampError.message,
-        );
-      }
-
-      const payload = buildStatusUpdatePayload(
-        nextStatus,
-        existing ?? undefined,
-      );
-
-      let { data: updated, error: updateError } = await supabaseAuth
+      const { data: updated, error: updateError } = await supabaseAuth
         .from("orders")
-        .update(payload)
+        .update({ status: nextStatus })
         .eq("id", orderId)
         .eq("driver_id", driverId)
+        .eq("status", order.status)
         .select("id,status")
         .maybeSingle();
-
-      // Retry with only the status if a timestamp column is unavailable.
-      if (updateError && Object.keys(payload).length > 1) {
-        const retry = await supabaseAuth
-          .from("orders")
-          .update({ status: nextStatus })
-          .eq("id", orderId)
-          .eq("driver_id", driverId)
-          .select("id,status")
-          .maybeSingle();
-
-        updated = retry.data;
-        updateError = retry.error;
-      }
 
       if (updateError || !updated) {
         console.error(
@@ -590,11 +559,7 @@ export default function DriverPortalContent() {
 
       await loadData(true);
 
-      setUpdateMessage(
-        nextStatus === "out_for_delivery"
-          ? "Delivery started successfully."
-          : "Order marked as delivered successfully.",
-      );
+      setUpdateMessage("Order marked as delivered successfully.");
     } catch (failure) {
       console.error("[UniEats Driver] Status update failed:", failure);
       setError("Failed to update delivery status. Refresh and try again.");
@@ -615,7 +580,7 @@ export default function DriverPortalContent() {
       return;
     }
 
-    if (order.status !== "ready" || order.driver_id != null) {
+    if (order.status !== "pending" || order.driver_id != null) {
       await loadData(true);
       setError("This order is no longer available to claim.");
       return;
@@ -748,21 +713,21 @@ export default function DriverPortalContent() {
         <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
           <div className="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm">
             <p className="text-2xl font-bold text-emerald-600">
-              {activeOrders.filter((order) => order.status === "ready").length}
+              {activeOrders.filter((order) => order.status === "pending").length}
             </p>
             <p className="mt-1 text-[11px] font-medium text-slate-500">
-              Ready
+              Incoming
             </p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm">
             <p className="text-2xl font-bold text-cyan-600">
               {activeOrders.filter(
-                (order) => order.status === "out_for_delivery",
+                (order) => order.status === "confirmed",
               ).length}
             </p>
             <p className="mt-1 text-[11px] font-medium text-slate-500">
-              En Route
+              Assigned
             </p>
           </div>
 
@@ -1033,7 +998,7 @@ export default function DriverPortalContent() {
 
                         <div className="mt-4 space-y-2">
                           {profile?.role === "driver" &&
-                            order.status === "ready" &&
+                            order.status === "pending" &&
                             order.driver_id == null && (
                               <button
                                 type="button"
@@ -1046,23 +1011,9 @@ export default function DriverPortalContent() {
                             )}
 
                           {profile?.role === "driver" &&
-                            order.status === "ready" &&
-                            order.driver_id != null &&
-                            assigned && (
-                              <button
-                                type="button"
-                                disabled={isUpdating}
-                                onClick={() =>
-                                  void updateStatus(order.id, "out_for_delivery")
-                                }
-                                className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300"
-                              >
-                                {isUpdating ? "Please wait..." : "Start Delivery"}
-                              </button>
-                            )}
-
-                          {profile?.role === "driver" &&
-                            order.status === "out_for_delivery" &&
+                            (order.status === "confirmed" ||
+                              order.status === "ready" ||
+                              order.status === "out_for_delivery") &&
                             assigned && (
                               <button
                                 type="button"
